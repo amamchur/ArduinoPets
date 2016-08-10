@@ -8,11 +8,6 @@
 #include "SWTFT.h"
 #include "SdFat.h"
 
-struct Settings {
-  int test;
-  byte q;
-};
-
 const uint8_t SOFT_MISO_PIN = 12;
 const uint8_t SOFT_MOSI_PIN = 11;
 const uint8_t SOFT_SCK_PIN  = 13;
@@ -23,17 +18,10 @@ const byte buttonPins[] PROGMEM = {53, 51, 49, 47, 37, 35, 33, 31};
 void buttonHanlder(unsigned int button, int event);
 ARDK::ButtonManager<sizeof(buttonPins)> bm(buttonPins, buttonHanlder);
 
-Settings settings = {0, 0};
-ARDK::EEPROMStorage<Settings> settingsStorage(0);
-ARDK::EEPROMStorage<Settings> settingsStorage1(settingsStorage.nextOffset());
-
-const char msg1[] = "123";
-const char msg2[] PROGMEM = "123";
-
 struct SensorValue {
   float multiplier;
   float constant;
-  float maximum;
+  float divider;
 };
 
 struct TouchConfig {
@@ -45,15 +33,10 @@ struct TouchConfig {
   bool swap;
 };
 
-SensorValue sv = {1, 0};
-const TouchConfig tc = {
-  {1, -190, 670},
-  {1, -210, 715},
+TouchConfig touchConfig = {
+  {1, 0, 500},
+  {1, 0, 500},
   {1, 0, 1023},
-
-  //  320, 240, // Notmal mode
-  //  false
-
   240, 320, // 90 deg rotation
   true
 };
@@ -66,6 +49,8 @@ class TouchSensorReader {
     int z() const;
 };
 
+ARDK::EEPROMStorage<TouchConfig> touchConfigStorage(0);
+
 #define YP A2  // must be an analog pin, use "An" notation!
 #define XM A3  // must be an analog pin, use "An" notation!
 #define YM 8   // can be a digital pin
@@ -74,7 +59,7 @@ class TouchSensorReader {
 // For better pressure precision, we need to know the resistance
 // between X+ and X- Use any multimeter to read it
 // For the one we're using, its 300 ohms across the X plate
-TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
+TouchScreen ts = TouchScreen(XP, YP, XM, YM, 600);
 
 #define BLACK   0x0000
 #define BLUE    0x001F
@@ -85,7 +70,6 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 #define YELLOW  0xFFE0
 #define WHITE   0xFFFF
 SWTFT tft;
-Adafruit_GFX_Button gfxButton;
 
 void setup(void) {
   Serial.begin(9600);
@@ -103,7 +87,89 @@ void setup(void) {
 
   bm.begin();
 
-  settingsStorage >> settings;
+  touchConfigStorage >> touchConfig;
+}
+
+const int iterationCount = 32;
+
+void calibrateTouchConstants() {
+  tft.fillScreen(WHITE);
+  tft.setCursor(0, 20);
+  tft.setTextColor(BLACK);  tft.setTextSize(2);
+  tft.println("Constants Calibration");
+  tft.println("Touch Top Left");
+  tft.println("Screen Corner");
+
+  int counter = 0;
+  float xOffset = 0;
+  float yOffset = 0;
+  while (counter < iterationCount) {
+    TSPoint p = ts.getPoint();
+    pinMode(XM, OUTPUT);
+    pinMode(YP, OUTPUT);
+    if (p.z < ts.pressureThreshhold) {
+      continue;
+    }
+
+    xOffset += p.x;
+    yOffset += p.y;
+
+    counter++;
+
+    tft.drawFastHLine(0, 120, tft.width() * ((float)counter / iterationCount), BLACK);
+
+    delay(100);
+  }
+
+  touchConfig.x.constant = -xOffset / counter;
+  touchConfig.y.constant = -yOffset / counter;
+  tft.print("X constant: "); tft.println(touchConfig.x.constant);
+  tft.print("Y constant: "); tft.println(touchConfig.y.constant);
+  touchConfigStorage << touchConfig;
+}
+
+void calibrateTouchDividers() {
+  tft.fillScreen(WHITE);
+  tft.setCursor(0, 20);
+  tft.setTextColor(BLACK);  tft.setTextSize(2);
+  tft.println("Dividers Calibration");
+  tft.println("Touch Bottom Right");
+  tft.println("Screen Corner");
+
+  int counter = 0;
+  float xOffset = 0;
+  float yOffset = 0;
+  while (counter < iterationCount) {
+    TSPoint p = ts.getPoint();
+    pinMode(XM, OUTPUT);
+    pinMode(YP, OUTPUT);
+    if (p.z < ts.pressureThreshhold) {
+      continue;
+    }
+
+    float x = p.x * touchConfig.x.multiplier + touchConfig.x.constant;
+    float y = p.y * touchConfig.y.multiplier + touchConfig.y.constant;
+    if (touchConfig.swap) {
+      float tmp = x;
+      x = y;
+      y = tmp;
+    }
+
+    xOffset += x;
+    yOffset += y;
+
+    counter++;
+
+    tft.drawFastHLine(0, 120, tft.width() * ((float)counter / iterationCount), BLACK);
+
+    delay(100);
+  }
+
+  touchConfig.x.divider = xOffset / counter;
+  touchConfig.y.divider = yOffset / counter;
+  tft.print("X divider: "); tft.println(touchConfig.x.divider);
+  tft.print("Y divider: "); tft.println(touchConfig.y.divider);
+  touchConfigStorage << touchConfig;
 }
 
 void testText() {
@@ -145,17 +211,18 @@ void readTouch() {
     //    Serial.print("\tY = "); Serial.print(p.y);
     //    Serial.print("\tPressure = "); Serial.println(p.z);
 
-    int x = p.x * tc.x.multiplier + tc.x.constant;
-    int y = p.y * tc.y.multiplier + tc.y.constant;
-    if (tc.swap) {
+    int x = p.x * touchConfig.x.multiplier + touchConfig.x.constant;
+    int y = p.y * touchConfig.y.multiplier + touchConfig.y.constant;
+    if (touchConfig.swap) {
       int tmp = x;
       x = y;
       y = tmp;
     }
 
-    int sx = x / tc.x.maximum * tc.screenWidth;
-    int sy = y / tc.y.maximum * tc.screenHeight;
-
+    int sx = x / touchConfig.x.divider * touchConfig.screenWidth;
+    int sy = y / touchConfig.y.divider * touchConfig.screenHeight;
+//    Serial.print("pz = "); Serial.println(p.z);
+    
     //    Serial.print("px = "); Serial.print(p.x);
     //    Serial.print("; tx = "); Serial.print(x);
     //    Serial.print("; sx = "); Serial.println(sx);
@@ -164,7 +231,7 @@ void readTouch() {
     //    Serial.print("; ty = "); Serial.print(y);
     //    Serial.print("; sy = "); Serial.println(sy);
 
-    tft.fillCircle(sx, sy, 3, WHITE);
+    tft.fillCircle(sx, sy, 1, BLACK);
   }
 }
 
@@ -176,7 +243,7 @@ void readTouch() {
 // makes loading a little faster.  20 pixels seems a
 // good balance.
 
-#define BUFFPIXEL 20
+#define BUFFPIXEL 64
 
 uint16_t read16(SdFile &f) {
   uint16_t result;
@@ -323,13 +390,13 @@ void buttonHanlder(unsigned int button, int event) {
 
   switch (button) {
     case 0:
-      tft.fillScreen(BLACK);
+      tft.fillScreen(WHITE);
       break;
     case 1:
-      tft.fillScreen(BLUE);
+      calibrateTouchConstants();
       break;
     case 2:
-      tft.fillScreen(RED);
+      calibrateTouchDividers();
       break;
     case 3:
       bmpDraw("woof.bmp", 0, 0);
@@ -341,14 +408,12 @@ void buttonHanlder(unsigned int button, int event) {
       bmpDraw("test.bmp", 0, 0);
       break;
     case 6:
-      settings.test = 0;
-      settingsStorage >> settings;
-      Serial.print("Read Value: "); Serial.println(settings.test);
+      touchConfigStorage >> touchConfig;
+      Serial.println("Read Value: ");
       break;
     case 7:
-      settings.test++;
-      settingsStorage << settings;
-      Serial.print("Write Value: "); Serial.println(settings.test);
+      touchConfigStorage << touchConfig;
+      Serial.print("Write Value: ");
       break;
   }
 }
