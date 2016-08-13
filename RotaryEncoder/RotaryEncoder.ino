@@ -75,20 +75,17 @@ void encoderHanlder(int step) {
 
 void setup() {
   Serial.begin(9600);
-  pinMode(EPIN_A, INPUT_PULLUP);
-  pinMode(EPIN_B, INPUT_PULLUP);
 
   bm.begin();
+  encoder.begin();
 
   tft.reset();
   uint16_t identifier = tft.readID();
   tft.begin(identifier);
   
-  delay(10);
+  delay(100);
   refreshScreenFull();
 }
-
-int lastState = 0;
 
 void loop() {
   bm.handle();
@@ -98,15 +95,4 @@ void loop() {
   if (needRefresh && (time - lastRefresh > 30)) {
     refreshScreen();
   }
-
-  //  int va = digitalRead(EPIN_A);
-  //  int vb = digitalRead(EPIN_B);
-  //  int state = va << 1 | vb;
-  //  if (state != lastState) {
-  //    Serial.print("A: "); Serial.print(va);
-  //    Serial.print(" B: "); Serial.println(vb);
-  //    Serial.println("--------");
-  //  }
-  //
-  //  lastState = state;
 }
