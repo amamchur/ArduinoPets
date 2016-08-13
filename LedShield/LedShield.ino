@@ -6,7 +6,7 @@ const byte buttonPins[] PROGMEM = {13, 12};
 ARDK::ButtonManager<sizeof(buttonPins)> bm(buttonPins, buttonHanlder);
 
 const byte ledPins[] PROGMEM = {2, 3, 4, 5, 6, 7, 8, 9};
-ARDK::LedDriver<sizeof(ledPins)> ld(ledPins);
+ARDK::OutputDriver<sizeof(ledPins)> ld(ledPins);
 
 int counter = 15;
 void buttonHanlder(unsigned int button, int event) {
