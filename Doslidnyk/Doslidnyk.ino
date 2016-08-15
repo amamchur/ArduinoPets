@@ -1,15 +1,15 @@
-#include <avr/pgmspace.h>
-#include <Arduino.h>
 #include <ARDK.h>
-#include <LiquidCrystal_I2C.h>
 
-LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
+using namespace ARDK;
 
-// Digital
 const int PIN_DS = 11;
 const int PIN_STCP = 12;
 const int PIN_SHCP = 13;
 
+const byte buttonPins[] PROGMEM = {47, 45, 43, 41, 37, 35, 33, 31, 29};
+void buttonHanlder(unsigned int button, int event);
+
+ARDK::ButtonManager<sizeof(buttonPins)> bm(buttonPins, buttonHanlder);
 ARDK::IC74HC595 ic74HC595(PIN_DS, PIN_STCP, PIN_SHCP);
 
 const uint32_t animationFrames[] PROGMEM = {
@@ -52,53 +52,56 @@ const int animationDelay = 30;
 unsigned long prevFrameTime = 0;
 int frameIndex = 0;
 
-void animate() {
-  unsigned long dt = millis() - prevFrameTime;
-  if (dt > animationDelay) {
-    uint32_t frame = pgm_read_dword_near(animationFrames + frameIndex);
-    ic74HC595 << frame;
-    frameIndex = (frameIndex + 1) % framesCount;
-    prevFrameTime = millis();
+//void animate() {
+//  unsigned long dt = millis() - prevFrameTime;
+//  if (dt > animationDelay) {
+//    uint32_t frame = pgm_read_dword_near(animationFrames + frameIndex);
+//    ic74HC595 << frame;
+//    frameIndex = (frameIndex + 1) % framesCount;
+//    prevFrameTime = millis();
+//  }
+//}
+
+void buttonHanlder(unsigned int button, int event) {
+  if (event != ARDK::BUTTON_EVENT_PRESS) {
+    return;
+  }
+
+  switch (button) {
+    case 0:
+      ic74HC595 << b0;
+      break;
+    case 1:
+      ic74HC595 << b1;
+      break;
+    case 2:
+      ic74HC595 << lsb<uint32_t>(0xF000F731);
+      break;
+    case 3:
+      ic74HC595 << msb<uint32_t>(0xF000F731);
+      break;
+    case 4:
+      ic74HC595 << lsb<uint8_t>(0x83);
+      break;
+    case 5:
+      ic74HC595 << msb<uint8_t>(0x83);
+      break;
+    case 6:
+      break;
+    case 7:
+      ic74HC595 << lsb<uint64_t>(0);
+      break;
   }
 }
 
 void setup() {
   Serial.begin(9600);
-  ic74HC595 << (uint32_t)0;
-
-  lcd.init();
-  lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.print("Potentiometer");
-  lcd.setCursor(0, 1);
-  lcd.print("Value:");
-}
-
-uint32_t potentiometer = 0;
-
-void readPotentiometer() {
-  int val = analogRead(3);
-  val = map(val, 0, 1000, 0, 32);
-  if (potentiometer == val) {
-    return;
-  }
-
-  potentiometer = val;
-
-  uint32_t v = 0;
-  for (int i = 0; i < potentiometer; i++) {
-    v <<= 1;
-    v |= 1;
-  }
-  ic74HC595 << v;
-
-  lcd.setCursor(7, 1);
-  lcd.print(val);
-  lcd.print("    ");
+  ARDK::LSB<int> q(3);
+  bm.begin();
+  ic74HC595.begin();
 }
 
 void loop() {
-  readPotentiometer();
-//  animate();
+  bm.handle();
 }
 
