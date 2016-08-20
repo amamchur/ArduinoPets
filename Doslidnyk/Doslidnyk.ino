@@ -6,11 +6,19 @@ const int PIN_DS = 11;
 const int PIN_STCP = 12;
 const int PIN_SHCP = 13;
 
+using namespace ARDK;
+
+const IC::IC74HC595<>::Config cfg PROGMEM = {
+  .DS = 11,
+  .STCP = 12,
+  .SHCP = 13
+};
+
 const byte buttonPins[] PROGMEM = {47, 45, 43, 41, 37, 35, 33, 31, 29};
 void buttonHanlder(unsigned int button, int event);
 
-ARDK::ButtonManager<sizeof(buttonPins)> bm(buttonPins, buttonHanlder);
-ARDK::IC74HC595 ic74HC595(PIN_DS, PIN_STCP, PIN_SHCP);
+IO::Buttons<sizeof(buttonPins)> bm(buttonPins, buttonHanlder);
+IC::IC74HC595<> ic74HC595(&cfg);
 
 const uint32_t animationFrames[] PROGMEM = {
   0x80000001,
@@ -52,44 +60,46 @@ const int animationDelay = 30;
 unsigned long prevFrameTime = 0;
 int frameIndex = 0;
 
-//void animate() {
-//  unsigned long dt = millis() - prevFrameTime;
-//  if (dt > animationDelay) {
-//    uint32_t frame = pgm_read_dword_near(animationFrames + frameIndex);
-//    ic74HC595 << frame;
-//    frameIndex = (frameIndex + 1) % framesCount;
-//    prevFrameTime = millis();
-//  }
-//}
+void animate() {
+  unsigned long dt = millis() - prevFrameTime;
+  if (dt > animationDelay) {
+    uint32_t frame = pgm_read_dword_near(animationFrames + frameIndex);
+    ic74HC595 << lsb<uint32_t>(frame) << end;
+    frameIndex = (frameIndex + 1) % framesCount;
+    prevFrameTime = millis();
+  }
+}
 
 void buttonHanlder(unsigned int button, int event) {
-  if (event != ARDK::BUTTON_EVENT_PRESS) {
+  if (event != IO::BUTTON_EVENT_PRESS) {
     return;
   }
 
+  Serial.println(button);
+
   switch (button) {
     case 0:
-      ic74HC595 << b0;
+      ic74HC595 << b0 << end;
       break;
     case 1:
-      ic74HC595 << b1;
+      ic74HC595 << b1 << end;
       break;
     case 2:
-      ic74HC595 << lsb<uint32_t>(0xF000F731);
+      ic74HC595 << lsb<uint32_t>(0xF000F731) << end;
       break;
     case 3:
-      ic74HC595 << msb<uint32_t>(0xF000F731);
+      ic74HC595 << msb<uint32_t>(0xF000F731) << end;
       break;
     case 4:
-      ic74HC595 << lsb<uint8_t>(0x83);
+      ic74HC595 << lsb<uint8_t>(0x83) << end;
       break;
     case 5:
-      ic74HC595 << msb<uint8_t>(0x83);
+      ic74HC595 << msb<uint8_t>(0x83) << end;
       break;
     case 6:
       break;
     case 7:
-      ic74HC595 << lsb<uint64_t>(0);
+      ic74HC595 << lsb<uint64_t>(0) << end;
       break;
   }
 }
