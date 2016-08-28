@@ -45,7 +45,7 @@ ModeHanlder modeHandlers[] = {
 
 const size_t ModeHanldersCount = sizeof(modeHandlers) / sizeof(ModeHanlder);
 
-IO::Buttons<sizeof(buttonPins)> bm(buttonPins, nullButtonHanlder);
+IO::Buttons<sizeof(buttonPins)> bm(buttonPins, ic74HC595ButtonHanlder);
 IC::IC74HC595<> ic74HC595(&cfg595);
 IC::IC74HC165<> ic74HC165(&cfg165);
 
@@ -69,10 +69,10 @@ void nullButtonHanlder(unsigned int button, int event) {
 
 void ic74HC595ButtonHanlder(unsigned int button, int event) {
   if (event != IO::BUTTON_EVENT_PRESS) {
+//    Serial.print("State event: ");
+//    Serial.println(event);
     return;
   }
-
-  Serial.println(button);
 
   uint8_t value;
 
@@ -141,7 +141,7 @@ void setup() {
 
 void loop() {
   bm.handle();
-  readApplicationMode();
-  loopHandler();
+//  readApplicationMode();
+//  loopHandler();
 }
 
