@@ -5,7 +5,7 @@
 using namespace ARDK;
 using namespace ARDK::IO;
 
-void keyPressed(char, int);
+void keyPressed(char, ButtonEvent);
 const uint8_t keypadPins[] PROGMEM = {52, 50, 48, 46, 44, 42, 40, 38};
 
 const char keys[4][4] PROGMEM = {
@@ -23,8 +23,8 @@ uint8_t contrast = 62;
 
 const uint8_t BUZZER_PIN = 2;
 
-void keyPressed(char ch, int event) {
-  if (event != BUTTON_EVENT_PRESS) {
+void keyPressed(char ch, ButtonEvent event) {
+  if (event != ButtonEventPress) {
     return;
   }
 
