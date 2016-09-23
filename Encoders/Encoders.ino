@@ -1,37 +1,63 @@
-#include <ARDK.h>
 #include <Arduino.h>
+#include <ARDK.h>
+#include <Servo.h>
 #include "LedControl.h"
 
 using namespace ARDK;
 
+void rotaryButtonHandler1(void *, IO::RotaryEvent re, IO::ButtonEvent be);
+void rotaryButtonHandler2(void *, IO::RotaryEvent re, IO::ButtonEvent be);
+
+typedef IO::ButtonRotaryEncoder<43, 45, 41, rotaryButtonHandler1, IO::RotaryHSM> ButtonRotaryEncoder1;
+typedef IO::ButtonRotaryEncoder<33, 31, 29, rotaryButtonHandler2, IO::RotaryFSM> ButtonRotaryEncoder2;
+
 LedControl lc = LedControl(11, 13, 12, 1);
+Servo servo;
 
-void rotaryButtonHandler(void *, IO::RotaryEvent re, IO::ButtonEvent be);
-void rotaryHandler(void *, IO::RotaryEvent re);
-
-IO::ButtonRotaryEncoder<43, 45, 41, rotaryButtonHandler, IO::RotaryHSM> encoder1;
-IO::RotaryEncoder<33, 31, rotaryHandler, IO::RotaryFSM> encoder2;
+ButtonRotaryEncoder1 encoder1;
+ButtonRotaryEncoder2 encoder2;
 
 long int counter = 0;
 bool needUpdate = true;
 unsigned long updateTime = 0;
 
-void rotaryHandler(void *, IO::RotaryEvent re) {
-  if (re != IO::RotaryEventNone) {
-    counter += re == IO::RotaryEventDirection1 ? -1 : 1;
-    setNeedUpdate();
+void setCounter(int c) {
+  counter = constrain(c, 0, 160);
+  servo.write(counter);
+  updateTime = millis();
+  needUpdate = true;
+}
+
+void rotaryButtonHandler2(void *, IO::RotaryEvent re, IO::ButtonEvent be) {
+  if (be == IO::ButtonEventPress) {
+    setCounter(0);
+    return;
+  }
+
+  switch (re) {
+    case IO::RotaryEventDirection1:
+      setCounter(counter + 1);
+      break;
+    case IO::RotaryEventDirection2:
+      setCounter(counter - 1);
+      break;
   }
 }
 
-void rotaryButtonHandler(void *sender, IO::RotaryEvent re, IO::ButtonEvent be) {
-  if (be == IO::ButtonEventPress) {
-    counter = 0;
-    setNeedUpdate();
+void rotaryButtonHandler1(void *sender, IO::RotaryEvent re, IO::ButtonEvent be) {
+  if (re == IO::RotaryEventNone) {
+    return;
+  }
+
+  ButtonRotaryEncoder1 *bre = (ButtonRotaryEncoder1 *)sender;
+  uint8_t state = bre->getState();
+  int value = re == IO::RotaryEventDirection1 ? -1 : 1;
+  if ((state & IO::BUTTON_STATE_CURRENT_STATE) == 1) {
+    value *= 10;
   }
 
   if (re != IO::RotaryEventNone) {
-    counter += re == IO::RotaryEventDirection1 ? -1 : 1;
-    setNeedUpdate();
+    setCounter(counter + value);
   }
 }
 
@@ -67,9 +93,10 @@ void updateDisplay() {
 
 void setup() {
   Serial.begin(9600);
+  servo.attach(7);
   encoder1.begin();
   encoder2.begin();
-  
+
   lc.shutdown(0, false);
   lc.setIntensity(0, 8);
   lc.clearDisplay(0);

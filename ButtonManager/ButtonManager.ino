@@ -1,29 +1,29 @@
 #include <LedControl.h>
 #include <ARDK.h>
 
+using namespace ARDK;
+
 LedControl lc = LedControl(51, 52, 53, 1);
 
 long counter = 88888888;
 int intensity = 0;
 
-void buttonHanlder(unsigned int button, int event);
-void balanceHandler(unsigned int button, int event);
+void buttonHanlder(void*, uint8_t, IO::ButtonEvent);
+void balanceHandler(void*, uint8_t, IO::ButtonEvent);
 
 const byte buttonPins[] PROGMEM = {49, 47, 45, 43, 41, 39, 37, 35};
-ARDK::ButtonManager<sizeof(buttonPins)> bm(buttonPins, buttonHanlder);
+IO::Buttons<sizeof(buttonPins)> bm(buttonPins, buttonHanlder);
 
-void balanceHandler(unsigned int button, int event) {
-  if (event == ARDK::BUTTON_EVENT_PRESS) {
+void balanceHandler(void* sender, uint8_t button, IO::ButtonEvent event) {
+  if (event == IO::ButtonEventPress) {
     return;
   }
 
   switch (event) {
-    case ARDK::BUTTON_EVENT_PRESS:
-      return;
-    case ARDK::BUTTON_EVENT_DOWN:
+    case IO::ButtonEventDown:
       counter++;
       break;
-    case ARDK::BUTTON_EVENT_UP:
+    case IO::ButtonEventUp:
       counter--;
       break;
   }
@@ -31,8 +31,8 @@ void balanceHandler(unsigned int button, int event) {
   displayNumber(counter);
 }
 
-void buttonHanlder(unsigned int button, int event) {
-  if (event != ARDK::BUTTON_EVENT_PRESS) {
+void buttonHanlder(void* sender, uint8_t button, IO::ButtonEvent event) {
+  if (event == IO::ButtonEventPress) {
     return;
   }
 
