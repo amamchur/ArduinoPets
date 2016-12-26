@@ -3,7 +3,9 @@
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_NeoPixel.h>
 #include <IRremote.h>
+#include <DS3231.h>
 
 #define DIGIT_0 0
 #define DIGIT_1 1
@@ -27,18 +29,22 @@ typedef struct {
   unsigned long irCommands[IR_COMMAND_LENGTH];
 } Config;
 
-int RECV_PIN = 11;
+#define RECV_PIN 11
+#define NUMPIXELS_PIN 3
+#define NUMPIXELS     12
 
 Config cfg;
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, NUMPIXELS_PIN, NEO_GRB + NEO_KHZ800);
 ARDK::EEPROMStorage<Config> configStorage(0);
 Adafruit_SSD1306 display;
+DS3231 rtc(SDA, SCL);
 IRrecv irrecv(RECV_PIN);
 
 #if (SSD1306_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
-uint8_t pins[] = {2, 3, 4, 5};
+uint8_t pins[] = {4, 5, 6, 7};
 uint8_t pinsCount = sizeof(pins) / sizeof(pins[0]);
 uint8_t leds = 0;
 bool lComma = false;
@@ -68,10 +74,6 @@ void setup() {
   initCfg();
   //configStorage >> cfg;
 
-  pinMode(2, OUTPUT);
-  pinMode(3, OUTPUT);
-  pinMode(4, OUTPUT);
-  pinMode(5, OUTPUT);
   pinMode(10, OUTPUT);
   pinMode(12, OUTPUT);
   pinMode(13, OUTPUT);
@@ -79,14 +81,52 @@ void setup() {
   digitalWrite(10, nixieEnabled ? 1 : 0);
 
   for (int i = 0; i < pinsCount; i++) {
+    pinMode(pins[i], OUTPUT);
     digitalWrite(pins[i], 0);
   }
 
   Serial.begin(9600);
   irrecv.enableIRIn(); // Start the receiver
-
+  rtc.begin();
+  
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
   display.display();
+}
+
+void drawTime(const Time &t) {
+  char timeStr[] = "00:00:00";
+  timeStr[0] += t.hour / 10;
+  timeStr[1] += t.hour % 10;
+
+  timeStr[3] += t.min / 10;
+  timeStr[4] += t.min % 10;
+
+  timeStr[6] += t.sec / 10;
+  timeStr[7] += t.sec % 10;
+
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 10);
+  display.println(timeStr);
+}
+
+void drawDate(const Time &t) {
+  char dateStr[] = "00.00.0000";
+  dateStr[0] += t.date / 10;
+  dateStr[1] += t.date % 10;
+
+  dateStr[3] += t.mon / 10;
+  dateStr[4] += t.mon % 10;
+
+  dateStr[6] += t.year / 1000;
+  dateStr[7] += (t.year / 100) % 10;
+  dateStr[8] += (t.year / 10) % 10;
+  dateStr[9] += t.year % 10;
+
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 30);
+  display.println(dateStr);
 }
 
 void processCommand(unsigned long results) {
@@ -98,8 +138,8 @@ void processCommand(unsigned long results) {
     }
   }
 
-//  Serial.println(results, HEX);
-//  Serial.println(index);
+  //  Serial.println(results, HEX);
+  //  Serial.println(index);
 
   if (index == -1) {
     return;
@@ -163,13 +203,14 @@ void loop() {
   decode_results results;
 
   if (irrecv.decode(&results)) {
+    Time t = rtc.getTime();
+    display.clearDisplay();
+    drawTime(t);
+    //drawDate(t);
+    display.display();
+
     processCommand(results.value);
     irrecv.resume(); // Receive the next value
-  }
-
-  if (refresh) {
-    Serial.print("Update!!!: ");
-    Serial.println(leds);
   }
 
   for (int i = 0; refresh && i < pinsCount; i++) {
