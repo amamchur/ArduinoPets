@@ -70,29 +70,6 @@ void initCfg() {
   cfg.irCommands[DIGIT_OFF_ON] = 0x20DF10EF;
 }
 
-void setup() {
-  initCfg();
-  //configStorage >> cfg;
-
-  pinMode(10, OUTPUT);
-  pinMode(12, OUTPUT);
-  pinMode(13, OUTPUT);
-
-  digitalWrite(10, nixieEnabled ? 1 : 0);
-
-  for (int i = 0; i < pinsCount; i++) {
-    pinMode(pins[i], OUTPUT);
-    digitalWrite(pins[i], 0);
-  }
-
-  Serial.begin(9600);
-  irrecv.enableIRIn(); // Start the receiver
-  rtc.begin();
-  
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
-  display.display();
-}
-
 void drawTime(const Time &t) {
   char timeStr[] = "00:00:00";
   timeStr[0] += t.hour / 10;
@@ -106,7 +83,7 @@ void drawTime(const Time &t) {
 
   display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.setCursor(0, 10);
+  display.setCursor(0, 5);
   display.println(timeStr);
 }
 
@@ -125,8 +102,17 @@ void drawDate(const Time &t) {
 
   display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.setCursor(0, 30);
+  display.setCursor(0, 25);
   display.println(dateStr);
+}
+
+void drawTemp() {
+  float temp = rtc.getTemp();
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 45);
+  display.print(temp);
+  display.println(" t,C");
 }
 
 void processCommand(unsigned long results) {
@@ -199,27 +185,88 @@ void processCommand(unsigned long results) {
   refresh = true;
 }
 
-void loop() {
+volatile unsigned int ticks = 0;
+volatile bool oledRefresh = true;
+volatile bool irRead = true;
+
+void timing() {
+  ticks++;
+  irRead = irRead || (ticks % 6554) == 0;
+  oledRefresh = oledRefresh || (ticks % 32768) == 0;
+
+  if (ticks > 32768) {
+    ticks = 0;
+  }
+}
+
+void setup() {
+  initCfg();
+  //configStorage >> cfg;
+
+  pinMode(10, OUTPUT);
+  pinMode(12, OUTPUT);
+  pinMode(13, OUTPUT);
+
+  digitalWrite(10, nixieEnabled ? 1 : 0);
+
+  for (int i = 0; i < pinsCount; i++) {
+    pinMode(pins[i], OUTPUT);
+    digitalWrite(pins[i], 0);
+  }
+
+  Serial.begin(9600);
+  irrecv.enableIRIn(); // Start the receiver
+  rtc.begin();
+  rtc.enable32KHz(true);
+
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
+  display.display();
+
+  Serial.println("Pin...");
+  Serial.println(digitalPinToInterrupt(3));
+
+  attachInterrupt(digitalPinToInterrupt(3), timing, RISING);
+}
+
+void refreshOLED() {
+  if (!oledRefresh) {
+    return;
+  }
+
+  Time t = rtc.getTime();
+  display.clearDisplay();
+  drawTime(t);
+  drawDate(t);
+  drawTemp();
+  display.display();
+
+  oledRefresh = false;
+}
+
+void readIR() {
   decode_results results;
-
   if (irrecv.decode(&results)) {
-    Time t = rtc.getTime();
-    display.clearDisplay();
-    drawTime(t);
-    //drawDate(t);
-    display.display();
-
     processCommand(results.value);
     irrecv.resume(); // Receive the next value
   }
+}
 
-  for (int i = 0; refresh && i < pinsCount; i++) {
+void refreshNixie() {
+  if (!refresh) {
+    return;
+  }
+
+  for (int i = 0; i < pinsCount; i++) {
     uint8_t value = (leds >> i) & 1;
     digitalWrite(pins[i], value);
   }
 
   refresh = false;
+}
 
-  delay(100);
+void loop() {
+  readIR();
+  refreshOLED();
+  refreshNixie();
 }
 
