@@ -3,71 +3,120 @@
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <Adafruit_NeoPixel.h>
 #include <IRremote.h>
 #include <DS3231.h>
 
-#define DIGIT_0 0
-#define DIGIT_1 1
-#define DIGIT_2 2
-#define DIGIT_3 3
-#define DIGIT_4 4
-#define DIGIT_5 5
-#define DIGIT_6 6
-#define DIGIT_7 7
-#define DIGIT_8 8
-#define DIGIT_9 9
-#define DIGIT_INC 10
-#define DIGIT_DEC 11
-#define DIGIT_L_COMMA 12
-#define DIGIT_R_COMMA 13
-#define DIGIT_OFF_ON 14
+typedef enum : int {
+  IRCommandDigit0,
+  IRCommandDigit1,
+  IRCommandDigit2,
+  IRCommandDigit3,
+  IRCommandDigit4,
+  IRCommandDigit5,
+  IRCommandDigit6,
+  IRCommandDigit7,
+  IRCommandDigit8,
+  IRCommandDigit9,
+  IRCommandInc,
+  IRCommandDec,
+  IRCommandLeftComma,
+  IRCommandRightComma,
+  IRCommandPowerMode,
 
-#define IR_COMMAND_LENGTH (DIGIT_OFF_ON + 1)
+  IRCommandCount
+} IRCommand;
 
 typedef struct {
-  unsigned long irCommands[IR_COMMAND_LENGTH];
+  unsigned long irCommands[IRCommandCount];
 } Config;
+
+typedef enum UpdateFlags {
+  UpdateFlagNone = 0,
+  UpdateFlagNixie = 1 << 0,
+  UpdateFlagOLED = 1 << 1,
+  UpdateFlagIR = 1 << 2,
+  UpdateFlagComma = 1 << 3,
+  UpdateFlagPower = 1 << 4,
+  UpdateFlagAll = UpdateFlagNone
+                  | UpdateFlagNixie
+                  | UpdateFlagOLED
+                  | UpdateFlagIR
+                  | UpdateFlagComma
+                  | UpdateFlagPower
+} UpdateFlags;
+
+typedef enum {
+  PowerModeNone = 0,
+  PowerModeNixie = 1 << 0,
+  PowerModeOLED = 1 << 1,
+  PowerModeAll = PowerModeNone
+                 | PowerModeNixie
+                 | PowerModeOLED
+} PowerMode;
+
+typedef enum {
+  CommaModeOff = 0,
+  CommaModeLeft = 1 << 0,
+  CommaModeRight = 1 << 1,
+  CommaModeAll = CommaModeOff
+                 | CommaModeLeft
+                 | CommaModeRight
+} CommaMode;
+
+template<class T> void setFlag(T &flags, T flag) {
+  flags = (T)(flags | flag);
+}
+
+template<class T> void toggleFlag(T &flags, T flag) {
+  flags = (T)(flags ^ flag);
+}
+
+template<class T> void nextFlag(T &flags, T allFlags) {
+  flags = (T)((flags + 1) & allFlags);
+}
+
+template<class T> void resetFlag(T &flags, T flag) {
+  flags = (T)(flags & ~flag);
+}
+
+#if (SSD1306_LCDHEIGHT != 64)
+#error("Height incorrect, please fix Adafruit_SSD1306.h!");
+#endif
 
 #define RECV_PIN 11
 #define NUMPIXELS_PIN 3
 #define NUMPIXELS     12
 
 Config cfg;
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, NUMPIXELS_PIN, NEO_GRB + NEO_KHZ800);
 ARDK::EEPROMStorage<Config> configStorage(0);
 Adafruit_SSD1306 display;
 DS3231 rtc(SDA, SCL);
 IRrecv irrecv(RECV_PIN);
 
-#if (SSD1306_LCDHEIGHT != 64)
-#error("Height incorrect, please fix Adafruit_SSD1306.h!");
-#endif
-
+uint8_t nixieDigit = 0;
 uint8_t pins[] = {4, 5, 6, 7};
-uint8_t pinsCount = sizeof(pins) / sizeof(pins[0]);
-uint8_t leds = 0;
-bool lComma = false;
-bool rComma = false;
-bool nixieEnabled = true;
-bool refresh = true;
+#define PINS_COUNT (sizeof(pins) / sizeof(pins[0]))
+
+PowerMode powerMode = PowerModeAll;
+CommaMode commaMode = CommaModeOff;
+UpdateFlags updateFlags = UpdateFlagAll;
 
 void initCfg() {
-  cfg.irCommands[DIGIT_0] = 0x20DF08F7;
-  cfg.irCommands[DIGIT_1] = 0x20DF8877;
-  cfg.irCommands[DIGIT_2] = 0x20DF48B7;
-  cfg.irCommands[DIGIT_3] = 0x20DFC837;
-  cfg.irCommands[DIGIT_4] = 0x20DF28D7;
-  cfg.irCommands[DIGIT_5] = 0x20DFA857;
-  cfg.irCommands[DIGIT_6] = 0x20DF6897;
-  cfg.irCommands[DIGIT_7] = 0x20DFE817;
-  cfg.irCommands[DIGIT_8] = 0x20DF18E7;
-  cfg.irCommands[DIGIT_9] = 0x20DF9867;
-  cfg.irCommands[DIGIT_INC] = 0x20DF00FF;
-  cfg.irCommands[DIGIT_DEC] = 0x20DF807F;
-  cfg.irCommands[DIGIT_L_COMMA] = 0x20DFCA35;
-  cfg.irCommands[DIGIT_R_COMMA] = 0x20DF58A7;
-  cfg.irCommands[DIGIT_OFF_ON] = 0x20DF10EF;
+  cfg.irCommands[IRCommandDigit0] = 0x20DF08F7;
+  cfg.irCommands[IRCommandDigit1] = 0x20DF8877;
+  cfg.irCommands[IRCommandDigit2] = 0x20DF48B7;
+  cfg.irCommands[IRCommandDigit3] = 0x20DFC837;
+  cfg.irCommands[IRCommandDigit4] = 0x20DF28D7;
+  cfg.irCommands[IRCommandDigit5] = 0x20DFA857;
+  cfg.irCommands[IRCommandDigit6] = 0x20DF6897;
+  cfg.irCommands[IRCommandDigit7] = 0x20DFE817;
+  cfg.irCommands[IRCommandDigit8] = 0x20DF18E7;
+  cfg.irCommands[IRCommandDigit9] = 0x20DF9867;
+  cfg.irCommands[IRCommandInc] = 0x20DF00FF;
+  cfg.irCommands[IRCommandDec] = 0x20DF807F;
+  cfg.irCommands[IRCommandLeftComma] = 0x20DFCA35;
+  cfg.irCommands[IRCommandRightComma] = 0x20DF58A7;
+  cfg.irCommands[IRCommandPowerMode] = 0x20DF10EF;
 }
 
 void drawTime(const Time &t) {
@@ -117,7 +166,7 @@ void drawTemp() {
 
 void processCommand(unsigned long results) {
   int index = -1;
-  for (int i = 0; i < IR_COMMAND_LENGTH; i++) {
+  for (int i = 0; i < IRCommandCount; i++) {
     if (cfg.irCommands[i] == results) {
       index = i;
       break;
@@ -132,71 +181,76 @@ void processCommand(unsigned long results) {
   }
 
   switch (index) {
-    case DIGIT_0:
-      leds = 0;
+    case IRCommandDigit0:
+      nixieDigit = 0;
       break;
-    case DIGIT_1:
-      leds = 1;
+    case IRCommandDigit1:
+      nixieDigit = 1;
       break;
-    case DIGIT_2:
-      leds = 2;
+    case IRCommandDigit2:
+      nixieDigit = 2;
       break;
-    case DIGIT_3:
-      leds = 3;
+    case IRCommandDigit3:
+      nixieDigit = 3;
       break;
-    case DIGIT_4:
-      leds = 4;
+    case IRCommandDigit4:
+      nixieDigit = 4;
       break;
-    case DIGIT_5:
-      leds = 5;
+    case IRCommandDigit5:
+      nixieDigit = 5;
       break;
-    case DIGIT_6:
-      leds = 6;
+    case IRCommandDigit6:
+      nixieDigit = 6;
       break;
-    case DIGIT_7:
-      leds = 7;
+    case IRCommandDigit7:
+      nixieDigit = 7;
       break;
-    case DIGIT_8:
-      leds = 8;
+    case IRCommandDigit8:
+      nixieDigit = 8;
       break;
-    case DIGIT_9:
-      leds = 9;
+    case IRCommandDigit9:
+      nixieDigit = 9;
       break;
-    case DIGIT_INC:
-      leds = (leds + 1) % 10;
+    case IRCommandInc:
+      nixieDigit = (nixieDigit + 1) % 10;
       break;
-    case DIGIT_DEC:
-      leds = (leds + 9) % 10;
+    case IRCommandDec:
+      nixieDigit = (nixieDigit + 9) % 10;
       break;
-    case DIGIT_L_COMMA:
-      lComma = !lComma;
-      digitalWrite(12, lComma ? 1 : 0);
+    case IRCommandLeftComma:
+      toggleFlag(commaMode, CommaModeLeft);
+      setFlag(updateFlags, UpdateFlagComma);
       break;
-    case DIGIT_R_COMMA:
-      rComma = !rComma;
-      digitalWrite(13, rComma ? 1 : 0);
+    case IRCommandRightComma:
+      toggleFlag(commaMode, CommaModeRight);
+      setFlag(updateFlags, UpdateFlagComma);
       break;
-    case DIGIT_OFF_ON:
-      nixieEnabled = !nixieEnabled;
-      digitalWrite(10, nixieEnabled ? 1 : 0);
+    case IRCommandPowerMode:
+      nextFlag(powerMode, PowerModeAll);
+      setFlag(updateFlags, UpdateFlagPower);
+      Serial.println(powerMode);
       break;
   }
 
-  refresh = true;
+  setFlag(updateFlags, UpdateFlagNixie);
 }
 
 volatile unsigned int ticks = 0;
-volatile bool oledRefresh = true;
-volatile bool irRead = true;
 
 void timing() {
   ticks++;
-  irRead = irRead || (ticks % 6554) == 0;
-  oledRefresh = oledRefresh || (ticks % 32768) == 0;
 
-  if (ticks > 32768) {
+  setFlag(updateFlags, (ticks & 0x3FF == 0x3FF) ? UpdateFlagIR : UpdateFlagNone);
+  setFlag(updateFlags, (ticks & 0x1FFF == 0x1FFF) ? UpdateFlagOLED : UpdateFlagNone);
+
+  if (ticks >= 32768) {
     ticks = 0;
   }
+}
+
+void setTime() {
+  rtc.setDate(28, 12, 2016);
+  rtc.setTime(04, 32, 00);
 }
 
 void setup() {
@@ -207,9 +261,7 @@ void setup() {
   pinMode(12, OUTPUT);
   pinMode(13, OUTPUT);
 
-  digitalWrite(10, nixieEnabled ? 1 : 0);
-
-  for (int i = 0; i < pinsCount; i++) {
+  for (int i = 0; i < PINS_COUNT; i++) {
     pinMode(pins[i], OUTPUT);
     digitalWrite(pins[i], 0);
   }
@@ -226,13 +278,11 @@ void setup() {
   Serial.println(digitalPinToInterrupt(3));
 
   attachInterrupt(digitalPinToInterrupt(3), timing, RISING);
+
+//  setTime();
 }
 
 void refreshOLED() {
-  if (!oledRefresh) {
-    return;
-  }
-
   Time t = rtc.getTime();
   display.clearDisplay();
   drawTime(t);
@@ -240,7 +290,7 @@ void refreshOLED() {
   drawTemp();
   display.display();
 
-  oledRefresh = false;
+  resetFlag(updateFlags, UpdateFlagOLED);
 }
 
 void readIR() {
@@ -252,21 +302,51 @@ void readIR() {
 }
 
 void refreshNixie() {
-  if (!refresh) {
-    return;
-  }
-
-  for (int i = 0; i < pinsCount; i++) {
-    uint8_t value = (leds >> i) & 1;
+  for (int i = 0; i < PINS_COUNT; i++) {
+    uint8_t value = (nixieDigit >> i) & 1;
     digitalWrite(pins[i], value);
   }
 
-  refresh = false;
+  resetFlag(updateFlags, UpdateFlagNixie);
+}
+
+void refreshPower() {
+  digitalWrite(10, (powerMode & PowerModeNixie) == PowerModeNixie ? 1 : 0);
+  if ((powerMode & PowerModeOLED) == PowerModeOLED) {
+    display.ssd1306_command(SSD1306_DISPLAYON);
+    //display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  } else {
+    display.ssd1306_command(SSD1306_DISPLAYOFF);
+  }
+
+  resetFlag(updateFlags, UpdateFlagPower);
+}
+
+void refreshComma() {
+  digitalWrite(12, (commaMode & CommaModeLeft) == CommaModeLeft ? 1 : 0);
+  digitalWrite(13, (commaMode & CommaModeRight) == CommaModeRight ? 1 : 0);
+  resetFlag(updateFlags, UpdateFlagComma);
 }
 
 void loop() {
-  readIR();
-  refreshOLED();
-  refreshNixie();
+  if ((updateFlags & UpdateFlagIR) != 0) {
+    readIR();
+  }
+
+  if ((updateFlags & UpdateFlagNixie) != 0) {
+    refreshNixie();
+  }
+
+  if ((updateFlags & UpdateFlagOLED) != 0) {
+    refreshOLED();
+  }
+
+  if ((updateFlags & UpdateFlagPower) != 0) {
+    refreshPower();
+  }
+
+  if ((updateFlags & UpdateFlagComma) != 0) {
+    refreshComma();
+  }
 }
 
