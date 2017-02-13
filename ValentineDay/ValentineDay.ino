@@ -12,9 +12,9 @@
  #define DeviceCount 4
 LedControl lc = LedControl(12, 11, 10, DeviceCount);
 
-uint32_t data[DeviceCount][8] = {0xFF};
+uint8_t data[DeviceCount][8] = {0xFF};
 
-unsigned long delaytime = 40;
+unsigned long delaytime = 35;
 
 void pushColumn(uint8_t col) {
   uint8_t carryFlags[8];;
@@ -37,23 +37,31 @@ void setup() {
   
   for (int i = 0; i < lc.getDeviceCount(); i++) {
     lc.shutdown(i,false);
-    lc.setIntensity(i,3);
+    lc.setIntensity(i,0);
     lc.clearDisplay(i);
    }
 }
 
 int bt = 0;
 int index = 0 ;
-char msg[] = "Be My Valentine \u007f\u007f\u007f";
-uint8_t kerning[sizeof(msg)] = {7, 7, 2, 7, 7, 2, 6, 6, 5, 6, 6, 6, 6, 6, 6, 2, 7, 7, 7, 7};
+
+//char msg[] = "Be My Valentine \u007f\u007f\u007f";
+//uint8_t kerning[sizeof(msg)] = {7, 7, 2, 7, 7, 2, 6, 6, 5, 6, 6, 6, 6, 6, 6, 2, 7, 7, 7, 7};
+
+char msg[] = "Happy Valentine's Day \u007f\u007f\u007f";
+uint8_t kerning[sizeof(msg)] = {
+  6, 7, 7, 7, 7, 4,                     // 'Happy '
+  6, 6, 5, 6, 5, 6, 6, 6, 6, 3, 7, 3,   // 'Valentine's '
+  7, 7, 7, 3,                           // 'Day '
+  7, 7, 7, 7                            // '\u007f\u007f\u007f '
+};
+
 int msgLength = sizeof(msg) - 1;
 
-void displayChar(int index) {
+void displayScreen() {
   for (int i = 0; i < DeviceCount; i++)  {
     for (int j = 0; j < 8; j++)  {
-      char d = data[i][j];
-      int v = d & 0xFF;
-      lc.setRow(i, j, v);
+      lc.setRow(i, j, data[i][j]);
     }
   }
 }
@@ -73,7 +81,7 @@ void pushChar(char ch, int b) {
 }
 
 void loop() {
-  displayChar(index);
+  displayScreen();
   delay(delaytime);
   pushChar(msg[index], bt);
   
