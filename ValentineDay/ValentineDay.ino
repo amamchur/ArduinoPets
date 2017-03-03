@@ -10,6 +10,7 @@
  We have only a single MAX72XX.
  */
  #define DeviceCount 4
+ 
 LedControl lc = LedControl(12, 11, 10, DeviceCount);
 
 uint8_t data[DeviceCount][8] = {0xFF};
@@ -37,24 +38,33 @@ void setup() {
   
   for (int i = 0; i < lc.getDeviceCount(); i++) {
     lc.shutdown(i,false);
-    lc.setIntensity(i,0);
+    lc.setIntensity(i, 8);
     lc.clearDisplay(i);
    }
 }
 
 int bt = 0;
 int index = 0 ;
+//
+//char msg[] = "Kill All Humans \u007f\u007f\u007f";
+//uint8_t kerning[sizeof(msg)] = {7, 5, 5, 5, 5, 7, 5, 5, 5, 7, 7, 7, 7, 7, 7, 5, 9, 9, 9, 7};
+
+char msg[] = "Welcome To Engineering Suckers";
+uint8_t kerning[sizeof(msg)] = { 7, 6, 5, 7, 7, 7, 7, 7,  7, 7, 7, 7,  7, 7, 7, 7,  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,  7, 7};
 
 //char msg[] = "Be My Valentine \u007f\u007f\u007f";
 //uint8_t kerning[sizeof(msg)] = {7, 7, 2, 7, 7, 2, 6, 6, 5, 6, 6, 6, 6, 6, 6, 2, 7, 7, 7, 7};
 
-char msg[] = "Happy Valentine's Day \u007f\u007f\u007f";
-uint8_t kerning[sizeof(msg)] = {
-  6, 7, 7, 7, 7, 4,                     // 'Happy '
-  6, 6, 5, 6, 5, 6, 6, 6, 6, 3, 7, 3,   // 'Valentine's '
-  7, 7, 7, 3,                           // 'Day '
-  7, 7, 7, 7                            // '\u007f\u007f\u007f '
-};
+//char msg[] = "Happy Valentine's Day \u007f\u007f\u007f";
+
+//uint8_t kerning[sizeof(msg)] = {
+//  6, 7, 7, 7, 7, 4,                     // 'Happy '
+//  6, 6, 5, 6, 5, 6, 6, 6, 6, 3, 7, 3,   // 'Valentine's '
+//  7, 7, 7, 3,                           // 'Day '
+//  7, 7, 7, 7                            // '\u007f\u007f\u007f '
+//};
+
+//welcome to engineering
 
 int msgLength = sizeof(msg) - 1;
 
