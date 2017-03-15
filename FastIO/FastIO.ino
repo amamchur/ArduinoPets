@@ -2,38 +2,25 @@
 
 using namespace ARDK::IO;
 
-template <class PIN> void test() {
-  PIN::mode(OUTPUT);
-  while (1) {
-    PIN::low();
-    delay(200);
-    PIN::high();
-    delay(200);
-  }
+void rotaryHandler(void*, RotaryEvent event) {
+  Serial.println(event);
 }
 
-int pin = A0;
-
-template <class PIN> void atest() {
-  //pinMode(A0, INPUT);
-  PIN::mode(INPUT);
-  while (1) {
-    uint16_t value = PIN::readQ();
-//    uint16_t value = analogRead(pin);
-
-//    uint16_t value = A0;
-    Serial.println(value);
-//    Serial.println(A0);
-    delay(500);
-  }
-}
+RotaryEncoder<D13, D12, rotaryHandler, RotaryHSM, INPUT> encoder;
 
 void setup() {
   Serial.begin(9600);
+  encoder.begin();
+  //  button2.begin();
+
+  D13::mode(INPUT);
+  D12::mode(INPUT);
+  D11::mode(OUTPUT);
 }
 
+uint8_t last = 0;
+
 void loop() {
-//  analogRead(A0);
-  atest<A01>();
+  encoder.handle();
 }
 
