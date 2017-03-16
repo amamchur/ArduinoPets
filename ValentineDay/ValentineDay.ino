@@ -1,5 +1,9 @@
 #include "LedControl.h"
 #include "font8x8_basic.h"
+#include <ARDK.h>
+using namespace ARDK::IO;
+using namespace ARDK::IC;
+
 
 /*
  Now we need a LedControl to work with.
@@ -10,35 +14,14 @@
  We have only a single MAX72XX.
  */
  #define DeviceCount 4
- 
+
+MAX7221<D12, D11, D10> max7221;
 LedControl lc = LedControl(12, 11, 10, DeviceCount);
 
-uint8_t data[DeviceCount][8] = {0xFF};
-
-unsigned long delaytime = 35;
-
-void pushColumn(uint8_t col) {
-  uint8_t carryFlags[8];;
-  for (int i = 0; i < 8; i++) {
-    carryFlags[i] = col & 1;
-    col >>= 1;
-  }
-  
-  for (uint8_t i = 0; i < DeviceCount; i++) {
-    for (uint8_t j = 0; j < 8; j++) {
-      uint8_t tmp = (data[i][j] & 0x80) >> 7;
-      data[i][j] = data[i][j] << 1 | carryFlags[j];
-      carryFlags[j] = tmp;
-    }
-  }
-}
-
 void setup() {
-  memset(data, 0, sizeof(data));
-  
   for (int i = 0; i < lc.getDeviceCount(); i++) {
     lc.shutdown(i,false);
-    lc.setIntensity(i, 8);
+    lc.setIntensity(i, 0);
     lc.clearDisplay(i);
    }
 }
