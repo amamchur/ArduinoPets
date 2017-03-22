@@ -6,74 +6,99 @@ using namespace ARDK::IC;
 
 #define BEEPER_PIN    3
 
-const uint8_t ledPins[] PROGMEM = {13, 12, 11, 10};
-Pins<OUTPUT> leds(ledPins, sizeof(ledPins));
+typedef A00 Potentiometer;
+typedef D13 Led1;
+typedef D12 Led2;
+typedef D11 Led3;
+typedef D10 Led4;
+typedef IC74HC595<D08, D04, D07> Display;
 
-const uint8_t buttonPins[] PROGMEM = {A1, A2, A3};
-void buttonsHandlers(uint8_t, ButtonEvent);
-Buttons<sizeof(buttonPins)> buttons(buttonPins, buttonsHandlers);
+void button1Handler(void*, ButtonEvent);
+void button2Handler(void*, ButtonEvent);
+void button3Handler(void*, ButtonEvent);
 
-#define LATCH_DIO 4
-#define CLK_DIO 7
-#define DATA_DIO 8
+Display segmentDisplay;
 
-const IC74HC595<>::Config cfg PROGMEM = {
-  .DS = 8,
-  .STCP = 4,
-  .SHCP = 7
-};
+/*******************
+ *  Segment mask (bit unset - led on)
+ *     0x01
+ *   ___V____
+ *  |        |
+ *  |<0x20   |
+ *  |        |<0x02
+ *  |  0x40  |
+ *  |___V____|
+ *  |        |
+ *  |<0x10   |
+ *  |        |<0x04
+ *  |  0x08  |
+ *  |___V____|o<0x80
+ * 
+*******************/
 
-IC74HC595<> icIC74HC595(&cfg);
+const uint8_t SEGMENT_MAP[] = {0xC0, 0xF9, 0xA4, 0xB0, 0x99, 0x92, 0x82, 0xF8, 0X80, 0X90};
+const uint8_t SEGMENT_SELECT[] = {0x01, 0x02, 0x04, 0x08};
+uint8_t segments[4] = {182, SEGMENT_MAP[1], SEGMENT_MAP[2], SEGMENT_MAP[3]};
+uint8_t segmentValue = 0xC0;
+uint8_t segmentMask = 0xF2;
+uint8_t displayMask = 0xFF;
+uint8_t index = 0;
 
-///* Segment byte maps for numbers 0 to 9 */
-//const byte SEGMENT_MAP[] = {0xC0, 0xF9, 0xA4, 0xB0, 0x99, 0x92, 0x82, 0xF8, 0X80, 0X90};
-///* Byte maps to select digit 1 to 4 */
-//const byte SEGMENT_SELECT[] = {0xF1, 0xF2, 0xF4, 0xF8};
+Button<A01, button1Handler> button1;
+Button<A02, button2Handler> button2;
+Button<A03, button3Handler> button3;
 
-uint16_t ledValue = 0x0000;
+void button1Handler(void*, ButtonEvent event) {
+  if (event == ButtonEventPress) {
+    segments[0] ^= 0x40;
+  }
+}
+
+void button2Handler(void*, ButtonEvent event) {
+  if (event == ButtonEventPress) {
+    segments[0] ^= 0x80;
+  }
+}
+
+void button3Handler(void*, ButtonEvent event) {
+  if (event == ButtonEventPress) {
+    segments[0] ^= 0x20;
+  }
+}
 
 void setup () {
-  //Beep beep(BEEPER_PIN, 100);
-
   Serial.begin(9600);
-  leds.init();
-  buttons.begin();
-  icIC74HC595.begin();
-  icIC74HC595 << msb << ledValue << end;
+  Potentiometer::mode(INPUT);
+  Led1::mode(OUTPUT);
+  Led2::mode(OUTPUT);
+  Led3::mode(OUTPUT);
+  Led4::mode(OUTPUT);
 
-  //  pinMode(LATCH_DIO, OUTPUT);
-  //  pinMode(CLK_DIO, OUTPUT);
-  //  pinMode(DATA_DIO, OUTPUT);
+  segmentDisplay.begin();
+  button1.begin();
+  button2.begin();
+  button3.begin();
+
+  BufferedOutput() << Led1(1) << Led2(1) << Led3(1) << Led4(1);
 }
+
+uint16_t value = 0;
+unsigned long lastTick = 0;
 
 void loop() {
-  buttons.handle();
-}
+  unsigned long t = millis();
+  unsigned long dt = t - lastTick;
 
-void buttonsHandlers(uint8_t button, ButtonEvent event) {
-  if (event != ButtonEventPress) {
-    return;
-  }
+  button1.handle();
+  button2.handle();
+  button3.handle();
 
-  switch (button) {
-    case 0:
-      digitalWrite(LATCH_DIO, LOW);
-      shiftOut(DATA_DIO, CLK_DIO, MSBFIRST, 0xC0);
-      shiftOut(DATA_DIO, CLK_DIO, MSBFIRST, 0xF1);
-      digitalWrite(LATCH_DIO, HIGH);
-      break;
-    case 1:
-      digitalWrite(LATCH_DIO, LOW);
-      shiftOut(DATA_DIO, CLK_DIO, MSBFIRST, 0xF9);
-      shiftOut(DATA_DIO, CLK_DIO, MSBFIRST, 0xF2);
-      digitalWrite(LATCH_DIO, HIGH);
-      break;
-    case 2:
-      digitalWrite(LATCH_DIO, LOW);
-      shiftOut(DATA_DIO, CLK_DIO, MSBFIRST, 0xA4);
-      shiftOut(DATA_DIO, CLK_DIO, MSBFIRST, 0xF4);
-      digitalWrite(LATCH_DIO, HIGH);
-      break;
+  if (dt > 3) { // 1s / 4 segments / 60hz ~ 0.00416 sec
+    lastTick = t;
+    index = (index + 1) & 0x3;
+    segmentMask = SEGMENT_SELECT[index];
+    segmentValue = segments[index];
+    segmentDisplay << segmentValue << segmentMask;
   }
 }
 
