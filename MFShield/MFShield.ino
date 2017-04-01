@@ -3,6 +3,7 @@
 using namespace ARDK;
 using namespace ARDK::IO;
 using namespace ARDK::IC;
+using namespace ARDK::Data;
 
 #define BEEPER_PIN    3
 
@@ -19,50 +20,68 @@ void button3Handler(void*, ButtonEvent);
 
 Display segmentDisplay;
 
-/*******************
- *  Segment mask (bit unset - led on)
- *     0x01
- *   ___V____
- *  |        |
- *  |<0x20   |
- *  |        |<0x02
- *  |  0x40  |
- *  |___V____|
- *  |        |
- *  |<0x10   |
- *  |        |<0x04
- *  |  0x08  |
- *  |___V____|o<0x80
- * 
-*******************/
-
-const uint8_t SEGMENT_MAP[] = {0xC0, 0xF9, 0xA4, 0xB0, 0x99, 0x92, 0x82, 0xF8, 0X80, 0X90};
-const uint8_t SEGMENT_SELECT[] = {0x01, 0x02, 0x04, 0x08};
-uint8_t segments[4] = {182, SEGMENT_MAP[1], SEGMENT_MAP[2], SEGMENT_MAP[3]};
-uint8_t segmentValue = 0xC0;
-uint8_t segmentMask = 0xF2;
-uint8_t displayMask = 0xFF;
+uint8_t segments[4];
 uint8_t index = 0;
+uint16_t value = 0;
 
 Button<A01, button1Handler> button1;
 Button<A02, button2Handler> button2;
 Button<A03, button3Handler> button3;
 
+void hexToSegments(uint16_t value) {
+  uint16_t v = value;
+  for (int i = 3; i >= 0; i--) {
+    uint8_t d = v & 0x0F;
+    segments[i] = ~Segment7::digit(d).dot(false);
+    v >>= 4;
+  }
+
+  for (int i = 0; i < 3; i++) {
+    if (segments[i] == 0xC0) {
+      segments[i] = 0xFF;
+    } else {
+      break;
+    }
+  }
+}
+
+void decToSegments(uint16_t value) {
+  uint16_t v = value;
+  for (int i = 3; i >= 0; i--) {
+    uint8_t d = v % 10;
+    segments[i] = ~Segment7::digit(d);
+    v = v / 10;
+  }
+
+  for (int i = 0; i < 3; i++) {
+    if (segments[i] == 0xC0) {
+      segments[i] = 0xFF;
+    } else {
+      break;
+    }
+  }
+}
+
+void (*fn)(uint16_t) = &decToSegments;
+
 void button1Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
-    segments[0] ^= 0x40;
+    value++;
+    fn(value);
   }
 }
 
 void button2Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
-    segments[0] ^= 0x80;
+    value--;
+    fn(value);
   }
 }
 
 void button3Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
-    segments[0] ^= 0x20;
+    value = Potentiometer::adc();
+    fn(value);
   }
 }
 
@@ -80,9 +99,9 @@ void setup () {
   button3.begin();
 
   BufferedOutput() << Led1(1) << Led2(1) << Led3(1) << Led4(1);
+  fn(value);
 }
 
-uint16_t value = 0;
 unsigned long lastTick = 0;
 
 void loop() {
@@ -96,8 +115,8 @@ void loop() {
   if (dt > 3) { // 1s / 4 segments / 60hz ~ 0.00416 sec
     lastTick = t;
     index = (index + 1) & 0x3;
-    segmentMask = SEGMENT_SELECT[index];
-    segmentValue = segments[index];
+    uint8_t segmentMask = 1 << index;
+    uint8_t segmentValue = segments[index];
     segmentDisplay << segmentValue << segmentMask;
   }
 }
