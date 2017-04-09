@@ -24,8 +24,8 @@ uint8_t segments[4];
 uint8_t index = 0;
 uint16_t value = 0;
 
-Button<A01, button1Handler> button1;
-Button<A02, button2Handler> button2;
+ButtonExt<A01, button1Handler> button1;
+ButtonExt<A02, button2Handler> button2;
 Button<A03, button3Handler> button3;
 
 void hexToSegments(uint16_t value) {
@@ -43,6 +43,8 @@ void hexToSegments(uint16_t value) {
       break;
     }
   }
+
+  segments[3] &= 0x7F;
 }
 
 void decToSegments(uint16_t value) {
@@ -80,7 +82,7 @@ void button2Handler(void*, ButtonEvent event) {
 
 void button3Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
-    value = Potentiometer::adc();
+    fn = fn == &decToSegments ? &hexToSegments : &decToSegments;
     fn(value);
   }
 }
@@ -108,9 +110,9 @@ void loop() {
   unsigned long t = millis();
   unsigned long dt = t - lastTick;
 
-  button1.handle();
-  button2.handle();
-  button3.handle();
+  button1.handle(t);
+  button2.handle(t);
+  button3.handle(t);
 
   if (dt > 3) { // 1s / 4 segments / 60hz ~ 0.00416 sec
     lastTick = t;
