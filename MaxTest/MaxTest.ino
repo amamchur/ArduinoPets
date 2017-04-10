@@ -7,10 +7,10 @@ using namespace ARDK::IC;
 const uint8_t DeviceCount = 4;
 
 /* Custom SPI configuration
- * Exchange Clock Pin 13 to 12
- * pin 11 -> DIN (MOSI)
- * NAP = Not A Pin (ignore MISO)
- * pin 12 -> CLK
+   Exchange Clock Pin 13 to 12
+   pin 11 -> DIN (MOSI)
+   NAP = Not A Pin (ignore MISO)
+   pin 12 -> CLK
 */
 //typedef CustomSPI<D11, NAP, D12> SPI;
 
@@ -21,13 +21,13 @@ const uint8_t DeviceCount = 4;
   pin 12 -> not connected (MISO)
   pin 13 -> CLK
 */
-typedef CustomSPI<D11, D12, D13> SPI;
+//typedef CustomSPI<D11, D12, D13> SPI;
 
 /*
- * Navive Arduino UNO SPI
- */
+   Navive Arduino UNO SPI
+*/
 
-//typedef MasterAvrSPI<1> SPI;
+typedef MasterAvrSPI<MSBFIRST> SPI;
 
 /* pin 10 is connected to LOAD (CS) */
 typedef MAX7221<SPI, D10> Device;
@@ -38,11 +38,15 @@ MAX7221Data<DeviceCount> matrix;
 int index = 0;
 
 void setup() {
+  Serial.begin(9600);
+
   max7221.begin().init(DeviceCount);
   max7221() << (Device::Intencity | 0x0)
             << (Device::Intencity | 0x4)
             << (Device::Intencity | 0x8)
             << (Device::Intencity | 0xC);
+  matrix.clear();
+  max7221.display(matrix);
 }
 
 void loop() {
@@ -55,6 +59,6 @@ void loop() {
 
   matrix.pushRows(frame);
   max7221.display(matrix);
-  delay(70);
+  delay(50);
 }
 
