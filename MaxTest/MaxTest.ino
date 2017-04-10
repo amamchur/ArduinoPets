@@ -15,7 +15,7 @@ const uint8_t DeviceCount = 4;
 //typedef CustomSPI<D11, NAP, D12> SPI;
 
 /*
-  Native SPI (Arduino UNO Pins) as Custom SPI
+  Native SPI pins (Arduino UNO Pins) as Custom SPI
   See https://www.arduino.cc/en/reference/SPI
   pin 11 -> DIN (MOSI)
   pin 12 -> not connected (MISO)
@@ -36,21 +36,20 @@ Device max7221;
 MAX7221Data<DeviceCount> matrix;
 
 int index = 0;
+uint8_t frame[8];
 
 void setup() {
   Serial.begin(9600);
+  D08::mode(OUTPUT);
 
   max7221.begin().init(DeviceCount);
   max7221() << (Device::Intencity | 0x0)
-            << (Device::Intencity | 0x4)
-            << (Device::Intencity | 0x8)
-            << (Device::Intencity | 0xC);
+            << (Device::Intencity | 0x0)
+            << (Device::Intencity | 0x0)
+            << (Device::Intencity | 0x0);
   matrix.clear();
   max7221.display(matrix);
-}
 
-void loop() {
-  uint8_t frame[8];
   for (int i = 0; i < 8; i++) {
     frame[i] = pgm_read_byte_near(&IMAGES[0][0] + index * 8 + i);
   }
@@ -58,7 +57,35 @@ void loop() {
   index = (index + 1) % IMAGES_LEN;
 
   matrix.pushRows(frame);
+
+  for (int i = 0; i < 8; i++) {
+    frame[i] = pgm_read_byte_near(&IMAGES[0][0] + index * 8 + i);
+  }
+
+  index = (index + 1) % IMAGES_LEN;
+
+  matrix.pushRows(frame);
+
+  for (int i = 0; i < 8; i++) {
+    frame[i] = pgm_read_byte_near(&IMAGES[0][0] + index * 8 + i);
+  }
+
+  index = (index + 1) % IMAGES_LEN;
+
+  matrix.pushRows(frame);
+
+  for (int i = 0; i < 8; i++) {
+    frame[i] = pgm_read_byte_near(&IMAGES[0][0] + index * 8 + i);
+  }
+
+  index = (index + 1) % IMAGES_LEN;
+
+  matrix.pushRows(frame);
+}
+
+void loop() {
   max7221.display(matrix);
-  delay(50);
+  D08::toggle();
+  //  D08::write(1 - D08::read());
 }
 
