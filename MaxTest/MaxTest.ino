@@ -26,17 +26,24 @@ const uint8_t DeviceCount = 4;
 /*
    Navive Arduino UNO SPI
 */
-
 typedef MasterAvrSPI<MSBFIRST> SPI;
 
 /* pin 10 is connected to LOAD (CS) */
-typedef MAX7221<SPI, D10> Device;
+typedef MAX72xx<SPI, D10> Device;
 
 Device max7221;
-MAX7221Data<DeviceCount> matrix;
+MAX72xxData<DeviceCount> matrix;
 
 int index = 0;
 uint8_t frame[8];
+
+void pushFrame(int index) {
+  for (int i = 0; i < 8; i++) {
+    frame[i] = pgm_read_byte_near(&IMAGES[0][0] + index * 8 + i);
+  }
+
+  matrix.pushRows(frame);
+}
 
 void setup() {
   Serial.begin(9600);
@@ -49,43 +56,12 @@ void setup() {
             << (Device::Intencity | 0x0);
   matrix.clear();
   max7221.display(matrix);
-
-  for (int i = 0; i < 8; i++) {
-    frame[i] = pgm_read_byte_near(&IMAGES[0][0] + index * 8 + i);
-  }
-
-  index = (index + 1) % IMAGES_LEN;
-
-  matrix.pushRows(frame);
-
-  for (int i = 0; i < 8; i++) {
-    frame[i] = pgm_read_byte_near(&IMAGES[0][0] + index * 8 + i);
-  }
-
-  index = (index + 1) % IMAGES_LEN;
-
-  matrix.pushRows(frame);
-
-  for (int i = 0; i < 8; i++) {
-    frame[i] = pgm_read_byte_near(&IMAGES[0][0] + index * 8 + i);
-  }
-
-  index = (index + 1) % IMAGES_LEN;
-
-  matrix.pushRows(frame);
-
-  for (int i = 0; i < 8; i++) {
-    frame[i] = pgm_read_byte_near(&IMAGES[0][0] + index * 8 + i);
-  }
-
-  index = (index + 1) % IMAGES_LEN;
-
-  matrix.pushRows(frame);
 }
 
 void loop() {
   max7221.display(matrix);
-  D08::toggle();
-  //  D08::write(1 - D08::read());
+  index = (index + 1) % IMAGES_LEN;
+  pushFrame(index);
+  delay(50);
 }
 
