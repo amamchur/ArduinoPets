@@ -19,7 +19,6 @@ typedef HD44780Interface8bit<Delay, BD02, NAP, BD03, BD04, BD05, BD06, BD07, BD0
 typedef Button<BD16, buttonHandler> EncoderButton;
 typedef RotaryEncoder<BD14, BD15, encoderHandler> Encoder;
 typedef HD44780<Interface8bit, 16, 2> LCD;
-//typedef HD44780<Interface4bit, 16, 2> LCD;
 
 EncoderButton encoderButton;
 Encoder encoder;
@@ -47,7 +46,7 @@ uint8_t smiley[8] = {
   0b00000
 };
 
-int number = 0;
+int number = 10;
 bool needUpdate = true;
 
 void buttonHandler(void*, ButtonEvent event) {
@@ -67,18 +66,21 @@ void updateIfNeeded() {
 
   char string[20];
   needUpdate = false;
-  sprintf(string, "Number%10d", number);
-  lcd.clear();
+  sprintf(string, "%8d", number);
+  lcd.move(8, 0);
   lcd.write(string);
 }
 
 void setup() {
+  Serial.begin(9600);
   encoderButton.begin();
   encoder.begin();
 
   lcd.begin();
   lcd.createChar(0, armsUp);
   lcd.createChar(1, smiley);
+  lcd.move(0, 0);
+  lcd.write("Number");
 }
 
 uint8_t v = 0;
