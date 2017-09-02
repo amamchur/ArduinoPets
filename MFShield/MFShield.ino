@@ -1,38 +1,45 @@
 #include <ARDK.h>
+#include <Board/Auto.hpp>
+#include <IO/Button.hpp>
+#include <IC/IC74HC595.hpp>
+#include <Data/Segment7.hpp>
+#include <Utils/Timeout.hpp>
 
 using namespace ARDK;
+using namespace ARDK::GPIO;
 using namespace ARDK::IO;
 using namespace ARDK::IC;
 using namespace ARDK::Data;
+using namespace ARDK::Board;
+using namespace ARDK::Utils;
 
-#define BEEPER_PIN    3
-
-typedef A00 Potentiometer;
-typedef D13 Led1;
-typedef D12 Led2;
-typedef D11 Led3;
-typedef D10 Led4;
-typedef IC74HC595<D08, D04, D07> Display;
+typedef BA00 Potentiometer;
+typedef ActiveLow<BD13> Led1;
+typedef ActiveLow<BD12> Led2;
+typedef ActiveLow<BD11> Led3;
+typedef ActiveLow<BD10> Led4;
+typedef ActiveLow<BD03> Beeper;
+typedef IC74HC595<BD08, BD04, BD07> Display;
 
 void button1Handler(void*, ButtonEvent);
 void button2Handler(void*, ButtonEvent);
 void button3Handler(void*, ButtonEvent);
 
 Display segmentDisplay;
+Timeout<4> timeout;
 
 uint8_t segments[4];
-uint8_t index = 0;
 uint16_t value = 0;
 
-ButtonExt<A01, button1Handler> button1;
-ButtonExt<A02, button2Handler> button2;
-Button<A03, button3Handler> button3;
+ButtonExt<BA01, button1Handler> button1;
+ButtonExt<BA02, button2Handler> button2;
+Button<BA03, button3Handler> button3;
 
 void hexToSegments(uint16_t value) {
   uint16_t v = value;
   for (int i = 3; i >= 0; i--) {
     uint8_t d = v & 0x0F;
-    segments[i] = ~Segment7::digit(d).dot(false);
+    segments[i] = ~Segment7::lsbf(d);
     v >>= 4;
   }
 
@@ -51,7 +58,7 @@ void decToSegments(uint16_t value) {
   uint16_t v = value;
   for (int i = 3; i >= 0; i--) {
     uint8_t d = v % 10;
-    segments[i] = ~Segment7::digit(d);
+    segments[i] = ~Segment7::lsbf(d);
     v = v / 10;
   }
 
@@ -66,10 +73,17 @@ void decToSegments(uint16_t value) {
 
 void (*fn)(uint16_t) = &decToSegments;
 
+void beepSound() {
+  Beeper::on();
+  delay(3);
+  Beeper::off();
+}
+
 void button1Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
     value++;
     fn(value);
+    beepSound();
   }
 }
 
@@ -77,6 +91,7 @@ void button2Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
     value--;
     fn(value);
+    beepSound();
   }
 }
 
@@ -84,42 +99,42 @@ void button3Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
     fn = fn == &decToSegments ? &hexToSegments : &decToSegments;
     fn(value);
+    beepSound();
   }
 }
 
+void dynamicIndication(uintptr_t) {
+  static uint8_t segmentIndex = 0;
+  uint8_t segmentMask = 1 << segmentIndex;
+  uint8_t segmentValue = segments[segmentIndex];
+  segmentDisplay << segmentValue << segmentMask;
+  segmentIndex = (segmentIndex + 1) & 0x3;
+  timeout.schedule(3, dynamicIndication);
+}
+
 void setup () {
-  Serial.begin(9600);
-  Potentiometer::mode(INPUT);
-  Led1::mode(OUTPUT);
-  Led2::mode(OUTPUT);
-  Led3::mode(OUTPUT);
-  Led4::mode(OUTPUT);
+  Potentiometer::mode<InputFloating>();
+  API::mode<Output>(
+    API::Chain()
+    & Led1() & Led2() & Led3() & Led4()
+    & Beeper());
+  API::write(API::Chain() & Led1() & Led2() & Led3() & Led4() & Beeper());
 
   segmentDisplay.begin();
   button1.begin();
   button2.begin();
   button3.begin();
-
-  BufferedOutput() << Led1(1) << Led2(1) << Led3(1) << Led4(1);
   fn(value);
+  timeout.schedule(0, dynamicIndication);
 }
 
-unsigned long lastTick = 0;
+unsigned long prevUpdateTime = 0;
 
 void loop() {
-  unsigned long t = millis();
-  unsigned long dt = t - lastTick;
-
-  button1.handle(t);
-  button2.handle(t);
-  button3.handle(t);
-
-  if (dt > 3) { // 1s / 4 segments / 60hz ~ 0.00416 sec
-    lastTick = t;
-    index = (index + 1) & 0x3;
-    uint8_t segmentMask = 1 << index;
-    uint8_t segmentValue = segments[index];
-    segmentDisplay << segmentValue << segmentMask;
-  }
+  unsigned long ms = millis();
+  button1.handle(ms);
+  button2.handle(ms);
+  button3.handle(ms);
+  timeout.handle(ms);
 }
 
