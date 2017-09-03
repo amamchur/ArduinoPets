@@ -5,6 +5,12 @@
 #include <Data/Segment7.hpp>
 #include <Utils/Timeout.hpp>
 
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+OneWire oneWire(A4);
+DallasTemperature sensors(&oneWire);
+
 using namespace ARDK;
 using namespace ARDK::GPIO;
 using namespace ARDK::IO;
@@ -43,14 +49,6 @@ void hexToSegments(uint16_t value) {
     v >>= 4;
   }
 
-  for (int i = 0; i < 3; i++) {
-    if (segments[i] == 0xC0) {
-      segments[i] = 0xFF;
-    } else {
-      break;
-    }
-  }
-
   segments[3] &= 0x7F;
 }
 
@@ -71,11 +69,17 @@ void decToSegments(uint16_t value) {
   }
 }
 
+void temperatureToSegments(uint16_t value) {
+  decToSegments(value);
+  segments[1] &= 0x7F;
+  segments[3] = ~(0x08 | 0x10 | 0x40);
+}
+
 void (*fn)(uint16_t) = &decToSegments;
 
 void beepSound() {
   Beeper::on();
-  delay(3);
+  delay(1);
   Beeper::off();
 }
 
@@ -83,7 +87,6 @@ void button1Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
     value++;
     fn(value);
-    beepSound();
   }
 }
 
@@ -91,15 +94,14 @@ void button2Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
     value--;
     fn(value);
-    beepSound();
   }
 }
 
 void button3Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
-    fn = fn == &decToSegments ? &hexToSegments : &decToSegments;
-    fn(value);
-    beepSound();
+    readTemperature(0);
+//    fn = fn == &decToSegments ? &hexToSegments : &decToSegments;
+//    fn(value);
   }
 }
 
@@ -109,7 +111,13 @@ void dynamicIndication(uintptr_t) {
   uint8_t segmentValue = segments[segmentIndex];
   segmentDisplay << segmentValue << segmentMask;
   segmentIndex = (segmentIndex + 1) & 0x3;
-  timeout.schedule(3, dynamicIndication);
+  timeout.schedule(0, dynamicIndication);
+}
+
+void readTemperature(uintptr_t) {
+  sensors.requestTemperatures();
+  uint16_t temp = sensors.getTempCByIndex(0) * 100;
+  temperatureToSegments(temp);
 }
 
 void setup () {
@@ -120,12 +128,17 @@ void setup () {
     & Beeper());
   API::write(API::Chain() & Led1() & Led2() & Led3() & Led4() & Beeper());
 
+  sensors.begin();
+
   segmentDisplay.begin();
   button1.begin();
   button2.begin();
   button3.begin();
   fn(value);
   timeout.schedule(0, dynamicIndication);
+
+  BD05::mode<Output>();
+  beepSound();
 }
 
 unsigned long prevUpdateTime = 0;
@@ -136,5 +149,6 @@ void loop() {
   button2.handle(ms);
   button3.handle(ms);
   timeout.handle(ms);
+  BD05::toggle();
 }
 
