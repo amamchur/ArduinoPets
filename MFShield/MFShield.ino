@@ -4,6 +4,7 @@
 #include <IC/IC74HC595.hpp>
 #include <Data/Segment7.hpp>
 #include <Utils/Timeout.hpp>
+#include <Framework/Auto.hpp>
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -32,7 +33,7 @@ void button2Handler(void*, ButtonEvent);
 void button3Handler(void*, ButtonEvent);
 
 Display segmentDisplay;
-Timeout<4> timeout;
+Timeout<&timer0_millis, 4> timeout;
 
 uint8_t segments[4];
 uint16_t value = 0;
@@ -45,7 +46,7 @@ void hexToSegments(uint16_t value) {
   uint16_t v = value;
   for (int i = 3; i >= 0; i--) {
     uint8_t d = v & 0x0F;
-    segments[i] = ~Segment7::lsbf(d);
+    segments[i] = ~Segment7::abcdASCII(d + 0x30);
     v >>= 4;
   }
 
@@ -56,13 +57,13 @@ void decToSegments(uint16_t value) {
   uint16_t v = value;
   for (int i = 3; i >= 0; i--) {
     uint8_t d = v % 10;
-    segments[i] = ~Segment7::lsbf(d);
+    segments[i] = ~Segment7::abcdASCII(d + 0x30);
     v = v / 10;
   }
 
   for (int i = 0; i < 3; i++) {
     if (segments[i] == 0xC0) {
-      segments[i] = 0xFF;
+      segments[i] = 0xff; //~Segment7::gfedASCII(' ');
     } else {
       break;
     }
@@ -100,8 +101,8 @@ void button2Handler(void*, ButtonEvent event) {
 void button3Handler(void*, ButtonEvent event) {
   if (event == ButtonEventPress) {
     readTemperature(0);
-//    fn = fn == &decToSegments ? &hexToSegments : &decToSegments;
-//    fn(value);
+    //    fn = fn == &decToSegments ? &hexToSegments : &decToSegments;
+    //    fn(value);
   }
 }
 
@@ -148,7 +149,7 @@ void loop() {
   button1.handle(ms);
   button2.handle(ms);
   button3.handle(ms);
-  timeout.handle(ms);
+  timeout.handle();
   BD05::toggle();
 }
 

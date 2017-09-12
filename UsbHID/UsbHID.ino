@@ -1,17 +1,13 @@
 
 #include "Mouse.h"
 #include <ARDK.h>
-#include <MCU/ATmega_16_32_U4.hpp>
+#include <Board/Auto.hpp>
 #include <IO/Button.hpp>
 
 using namespace ARDK;
 using namespace ARDK::GPIO;
 using namespace ARDK::MCU;
 using namespace ARDK::IO;
-
-typedef ATmega_16_32_U4 MMCU;
-typedef MMCU::PinD4 MyPin;
-typedef BaseAPI<MMCU::GPIOChain> API;
 
 int16_t xAxisOrigin = 0;
 int16_t yAxisOrigin = 0;
@@ -44,8 +40,8 @@ void handlerRightButton(void *, ButtonEvent event) {
   }
 }
 
-typedef ButtonExt<MMCU::PinF5, handlerLeftButton, InputPullUp, 5, 0> LeftButton;
-typedef Button<MMCU::PinB5, handlerRightButton, InputPullUp, 5, 0> RightButton;
+typedef ButtonExt<ATmega_16_32_U4::PinF5, handlerLeftButton, InputPullUp, 5, 0> LeftButton;
+typedef Button<ATmega_16_32_U4::PinB5, handlerRightButton, InputPullUp, 5, 0> RightButton;
 LeftButton leftButton;
 RightButton rightButton;
 
