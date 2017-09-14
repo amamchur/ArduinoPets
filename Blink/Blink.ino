@@ -1,13 +1,13 @@
-#include <ARDK.h>
+#include <MCURDK.h>
 #include <Board/Auto.hpp>
-#include <Framework/Auto.hpp>
+#include <Utils/Tools.hpp>
 
-using namespace ARDK;
-using namespace ARDK::GPIO;
-using namespace ARDK::Board;
-using namespace ARDK::Framework;
+using namespace MCURDK;
+using namespace MCURDK::GPIO;
+using namespace MCURDK::Board;
 
-Delay d;
+typedef Utils::Tools<uint32_t, &timer0_millis> Tools;
+typedef typename ::Tools::Delay Delay;
 
 void setup() {
   BuildInLed::mode<Output>();
@@ -15,20 +15,8 @@ void setup() {
 
 void loop() {
   BuildInLed::high();
-  d.milliseconds(500);
+  Delay::milliseconds(500);
   BuildInLed::low();
-  d.milliseconds(500);
-}
-
-// Comment it to use Arduino framework (+310 code; +9 memory)
-int main() {
-  BuildInLed::mode<Output>();
-  while(1) {
-    BuildInLed::high();
-    d.milliseconds(500); 
-    BuildInLed::low();
-    d.milliseconds(500);
-  }
-  return 0;
+  Delay::milliseconds(500);
 }
 
