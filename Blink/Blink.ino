@@ -1,22 +1,28 @@
 #include <MCURDK.h>
 #include <Board/Auto.hpp>
-#include <Utils/Tools.hpp>
+#include <Utils/ToolSet.hpp>
+#include <Utils/MillisecondsCounter.hpp>
 
 using namespace MCURDK;
 using namespace MCURDK::GPIO;
 using namespace MCURDK::Board;
+using namespace MCURDK::Utils;
 
-typedef Utils::Tools<uint32_t, &timer0_millis> Tools;
-typedef typename ::Tools::Delay Delay;
+//typedef MillisecondsCounter<typeof(timer0_millis), &timer0_millis> Counter;
+//typedef Utils::ToolSet<Counter> Tools;
+//typedef typename ::Tools::Delay D;
 
 void setup() {
-  BuildInLed::mode<Output>();
+  Serial.begin(9600);
+  Serial.println("Hello");
+//  BuildInLed::mode<Output>();
 }
 
 void loop() {
-  BuildInLed::high();
-  Delay::milliseconds(500);
-  BuildInLed::low();
-  Delay::milliseconds(500);
+  Serial.println("Hello");
+//  BuildInLed::high();
+//  D::milliseconds(500);
+//  BuildInLed::low();
+//  D::milliseconds(500);
 }
 
