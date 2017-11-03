@@ -30,8 +30,10 @@ typedef Button<BA02, Counter> LeftButton;
 typedef Button<BD05, Counter> RightButton;
 typedef RotaryEncoder<BD07, BD08, Rotary2PhaseMachine> Encoder;
 
-Tools::FunctionTimeout<8> timeout;
+Tools::FunctionTimeout<16> timeout;
 
+const uint32_t PressInteval = 61000;
+uint32_t nextPressing = 0;
 int16_t xAxisOrigin = 0;
 int16_t yAxisOrigin = 0;
 int16_t maxStep = 10;
@@ -50,16 +52,19 @@ bool pressingEnabled = false;
 void renderMenu();
 
 void sendKeys() {
-//  Keyboard.print("98765");
-  timeout.schedule(61000, sendKeys);
+  Keyboard.print("987654321");
+  nextPressing = Counter::now() + PressInteval;
+  timeout.schedule(PressInteval, sendKeys);
+  renderMenu();
 }
 
 void handlerLeftButton(ButtonEvent event) {
   switch (event) {
     case ButtonEventPress:
       timeout.clear();
+      nextPressing = Counter::now() + PressInteval;
       pressingEnabled = false;
-      renderMenu();
+      timeout.schedule(0, renderManuInterval);
     default:
       break;
   }
@@ -71,7 +76,7 @@ void handlerRightButton(ButtonEvent event) {
       timeout.clear();
       timeout.schedule(0, sendKeys);
       pressingEnabled = true;
-      renderMenu();
+      timeout.schedule(0, renderManuInterval);
     default:
       break;
   }
@@ -94,7 +99,13 @@ void renderCalibrartion() {
 
 void renderPresseingState() {
   display.print("Auto Press");
-  display.println(pressingEnabled ? " Yes" : " No");
+  display.println(pressingEnabled ? "Enabled" : "Disabled");
+  if (pressingEnabled) {
+    uint32_t t = (nextPressing - Counter::now()) / 1000;
+    display.print("After: ");
+    display.print(t);
+    display.print("s");
+  }
 }
 
 void renderMenu() {
@@ -120,6 +131,11 @@ void renderMenu() {
   display.display();
 }
 
+void renderManuInterval() {
+  renderMenu();
+  timeout.schedule(1000, renderManuInterval);
+}
+
 LeftButton leftButton;
 RightButton rightButton;
 Encoder encoder;
@@ -143,7 +159,7 @@ void setup() {
   BD09::mode<Input>();
   BD08::mode<Output>();
   BD07::mode<Output>();
-  
+
   leftButton.begin();
   rightButton.begin();
   encoder.begin();
@@ -152,9 +168,9 @@ void setup() {
   display.display();
 
   calibrate();
-  //Keyboard.begin();
+  Keyboard.begin();
 
-  renderMenu();
+  timeout.schedule(0, renderManuInterval);
 }
 
 int value = 0;
