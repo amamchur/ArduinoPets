@@ -6,8 +6,8 @@
 #include "IO/Button.hpp"
 #include "Utils/ToolSet.hpp"
 #include "Utils/MillisecondsCounter.hpp"
+#include "Shields/UnoMultiFunctionalShield.hpp"
 #include "IC/WS2812.hpp"
-#include "IC/IC74HC595.hpp"
 
 IRrecv irrecv(2);
 IRsend irsend;
@@ -19,12 +19,6 @@ using namespace MCURDK::IC;
 using namespace MCURDK::Data;
 using namespace MCURDK::GPIO;
 
-typedef ActiveLow<BD13> Led1;
-typedef ActiveLow<BD12> Led2;
-typedef ActiveLow<BD11> Led3;
-typedef ActiveLow<BD10> Led4;
-typedef ActiveDrain<BD03> Beeper;
-typedef IC74HC595<BD08, BD04, BD07> ShieldDisplay;
 typedef BD05 LedDataIn;
 
 typedef uint32_t CounterType;
@@ -32,6 +26,7 @@ typedef MCURDK::Utils::MillisecondsCounter<CounterType, &timer0_millis> Counter;
 typedef MCURDK::Utils::ToolSet<Counter> Tools;
 typedef Tools::Delay Delay;
 typedef Tools::FunctionTimeout<16, int16_t> Timeout;
+typedef MCURDK::Shields::UnoMultiFunctionalShield<Tools> Shield;
 
 typedef enum LedMode {
   LedModeOff,
@@ -44,10 +39,7 @@ typedef enum LedMode {
   LedModeCount
 } LedMode;
 
-ButtonExt<BA01, Counter> button1;
-ButtonExt<BA02, Counter> button2;
-ButtonExt<BA03, Counter> button3;
-ShieldDisplay shieldDisplay;
+Shield mfs;
 
 typedef struct Pixel {
   uint8_t green;
@@ -114,7 +106,7 @@ void runShift(int16_t) {
   timeout.schedule(2000, runShift);
 }
 
-void fillData(LedMode lm) {
+void fillData(int lm) {
   if (lm == LedModeOff) {
     memset (renderBuffer, 0, sizeof(renderBuffer));
     return;
@@ -158,21 +150,14 @@ void setup() {
   Serial.begin(9600);
   irrecv.enableIRIn();
 
-  API::mode<PinMode::Output>(API::Chain() & Led1() & Led2() & Led3() & Led4() & Beeper());
-  Led1::off();
-  Led2::off();
-  Led3::off();
-  Led4::off();
-  Beeper::off();
-
-  button1.begin();
-  button2.begin();
-  button3.begin();
-  shieldDisplay.begin();
+  mfs.begin();
   neoPixel.begin();
 
   fillData(mode);
   neoPixel.display();
+
+  mfs.beep();
+  mfs.hexToSegments(mode);
 }
 
 void setBrightness(float d) {
@@ -193,6 +178,8 @@ void setBrightness(float d) {
 }
 
 void loop() {
+  mfs.dynamicIndication();
+  mfs.handle();
   timeout.handle();
 
   decode_results results;
@@ -217,6 +204,7 @@ void loop() {
           shiftCount = 0;
           break;
       }
+      mfs.hexToSegments(mode);
       fillData(mode);
       neoPixel.display();
       break;
