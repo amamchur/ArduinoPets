@@ -33,6 +33,17 @@ typedef MCURDK::Utils::ToolSet<Counter> Tools;
 typedef Tools::Delay Delay;
 typedef Tools::FunctionTimeout<16, int16_t> Timeout;
 
+typedef enum LedMode {
+  LedModeOff,
+  LedMode1_3,
+  LedMode2_3,
+  LedMode1_4,
+  LedMode2_4,
+  LedMode3_4,
+  LedModeFull,
+  LedModeCount
+} LedMode;
+
 ButtonExt<BA01, Counter> button1;
 ButtonExt<BA02, Counter> button2;
 ButtonExt<BA03, Counter> button3;
@@ -45,17 +56,23 @@ typedef struct Pixel {
   uint8_t white;
 } Pixel;
 
+const uint8_t MaxLedValue = 0x0F;
+const float BrightnessStep = 1.0 / (MaxLedValue + 1);
 const int16_t PixelCount = 120;
 const int16_t Half = PixelCount / 2;
 const int16_t ThirdPart = PixelCount / 3;
 
-Pixel pixels[PixelCount];
+uint8_t shiftCount = PixelCount / 3;
+
+float brightness = 0.5;
+LedMode mode = LedMode1_3;
+Pixel renderBuffer[PixelCount];
 
 typedef TransmitterWS2812<LedDataIn, F_CPU, TimingSK6812> Transmitter;
 class NeoPixel : public WS2812<Transmitter, typename Tools::Delay> {
   public:
     inline void display() {
-      send(pixels, sizeof(pixels));
+      send(renderBuffer, sizeof(renderBuffer));
     }
 };
 
@@ -63,29 +80,33 @@ NeoPixel neoPixel;
 Timeout timeout;
 
 void shiftLeft(int16_t counter) {
-  Pixel p = pixels[0];
-  for (int16_t i = 0; i < PixelCount - 1; i++) {
-    pixels[i] = pixels[i + 1];
+  if (counter == 0) {
+    return;
   }
-  pixels[PixelCount - 1] = p;
+
+  Pixel p = renderBuffer[0];
+  for (int16_t i = 0; i < PixelCount - 1; i++) {
+    renderBuffer[i] = renderBuffer[i + 1];
+  }
+  renderBuffer[PixelCount - 1] = p;
   neoPixel.display();
 
-  if (counter > 1) {
-    timeout.schedule(0, shiftLeft, counter - 1);
-  }
+  timeout.schedule(0, shiftLeft, counter - 1);
 }
 
 void shiftRight(int16_t counter) {
-  Pixel p = pixels[PixelCount - 1];
-  for (int16_t i = PixelCount - 1; i > 0; i--) {
-    pixels[i] = pixels[i - 1];
+  if (counter == 0) {
+    return;
   }
-  pixels[0] = p;
+
+  Pixel p = renderBuffer[PixelCount - 1];
+  for (int16_t i = PixelCount - 1; i > 0; i--) {
+    renderBuffer[i] = renderBuffer[i - 1];
+  }
+  renderBuffer[0] = p;
   neoPixel.display();
 
-  if (counter > 1) {
-    timeout.schedule(0, shiftRight, counter - 1);
-  }
+  timeout.schedule(0, shiftRight, counter - 1);
 }
 
 void runShift(int16_t) {
@@ -93,13 +114,43 @@ void runShift(int16_t) {
   timeout.schedule(2000, runShift);
 }
 
-void fillData(int16_t count) {
+void fillData(LedMode lm) {
+  if (lm == LedModeOff) {
+    memset (renderBuffer, 0, sizeof(renderBuffer));
+    return;
+  }
+
+  int16_t count = 0;
+  switch (lm) {
+    case LedMode1_3:
+      count = PixelCount / 3;
+      break;
+    case LedMode2_3:
+      count = 2 * PixelCount / 3;
+      break;
+    case LedMode1_4:
+      count = PixelCount / 4;
+      break;
+    case LedMode2_4:
+      count = 2 * PixelCount / 4;
+      break;
+    case LedMode3_4:
+      count = 3 * PixelCount / 4;
+      break;
+    case LedModeFull:
+      count = PixelCount;
+      break;
+    default:
+      break;
+  }
+
+  uint8_t value = MaxLedValue * brightness;
   for (int16_t i = 0; i < PixelCount; i++) {
-    uint8_t w = i < count ? 255 : 0;
-    pixels[i].green = w;
-    pixels[i].red = w;
-    pixels[i].blue = w;
-    pixels[i].white = w;
+    uint8_t w = i < count ? value : 0;
+    renderBuffer[i].green = w;
+    renderBuffer[i].red = w;
+    renderBuffer[i].blue = w;
+    renderBuffer[i].white = w;
   }
 }
 
@@ -120,9 +171,25 @@ void setup() {
   shieldDisplay.begin();
   neoPixel.begin();
 
-  fillData(40);
+  fillData(mode);
   neoPixel.display();
-  //  timeout.schedule(0, runShift);
+}
+
+void setBrightness(float d) {
+  float next = brightness + d;
+  if (next > 1.0) {
+    next = 1.0;
+  }
+
+  if (next < 0.0) {
+    next = 0.0;
+  }
+
+  Serial.println(next);
+
+  brightness = next;
+  fillData(mode);
+  neoPixel.display();
 }
 
 void loop() {
@@ -134,14 +201,36 @@ void loop() {
   }
   irrecv.resume();
   switch (results.value) {
-    case 0x00FF22DD:
-    case 0x03F4807F:
-      Serial.println("sinft left");
-      timeout.schedule(0, shiftLeft, ThirdPart);
+    case 0x807FA857:
+      mode = (LedMode)((mode + 1) % LedModeCount);
+      switch (mode) {
+        case LedMode1_3:
+        case LedMode2_3:
+          shiftCount = PixelCount / 3;
+          break;
+        case LedMode1_4:
+        case LedMode2_4:
+        case LedMode3_4:
+          shiftCount = PixelCount / 4;
+          break;
+        default:
+          shiftCount = 0;
+          break;
+      }
+      fillData(mode);
+      neoPixel.display();
       break;
-    case 0x00FFC23D:
-    case 0x03F4C03F:
-      timeout.schedule(0, shiftRight, ThirdPart);
+    case 0x807FE817:
+      setBrightness(BrightnessStep);
+      break;
+    case 0x807F58A7:
+      setBrightness(-BrightnessStep);
+      break;
+    case 0x807F42BD:
+      timeout.schedule(0, shiftLeft, shiftCount);
+      break;
+    case 0x807F827D:
+      timeout.schedule(0, shiftRight, shiftCount);
       break;
   }
   Serial.println(results.value, HEX);
