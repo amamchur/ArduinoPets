@@ -1,5 +1,6 @@
 #include "AppConfig.hpp"
 
+#include <IRremote.h>
 #include <MCURDK.h>
 #include <Board/Auto.hpp>
 #include <IO/OutputStream.hpp>
@@ -26,6 +27,8 @@ const uint64_t Digits[] = {
   0x3844043c44444438,
 };
 
+int RECV_PIN = A2;
+
 const int DigitsCount = sizeof(Digits) / sizeof(Digits[0]);
 const uint32_t ScrollTimeout = 60;
 const int8_t ScrollSpace = 1;
@@ -38,6 +41,8 @@ RTC rtc;
 MAX7219 max7219;
 Matrix matrix;
 Matrix buffer;
+
+IRrecv irrecv(RECV_PIN);
 
 Button1 button1;
 Button2 button2;
@@ -214,6 +219,8 @@ void setup() {
   USART::begin<CfgUSART>();
   I2C::begin<CfgI2C>();
 
+  irrecv.enableIRIn();
+
   button1.begin();
   button2.begin();
   button3.begin();
@@ -233,6 +240,8 @@ void setup() {
 }
 
 void button1Handler(IO::ButtonEvent event) {
+  cout << "button1Handler" << IO::endl;
+
   if (event != IO::ButtonEventPress) {
     return;
   }
@@ -248,6 +257,8 @@ void button1Handler(IO::ButtonEvent event) {
 }
 
 void button2Handler(IO::ButtonEvent event) {
+  cout << "button2Handler" << IO::endl;
+
   if (event != IO::ButtonEventPress) {
     return;
   }
@@ -260,12 +271,16 @@ void button2Handler(IO::ButtonEvent event) {
 }
 
 void button3Handler(IO::ButtonEvent event) {
-  if (event == IO::ButtonEventPress) {
-    cout << "button3Handler" << IO::endl;
+  cout << "button3Handler" << IO::endl;
+
+  if (event != IO::ButtonEventPress) {
+    return;
   }
 }
 
 void button4Handler(IO::ButtonEvent event) {
+  cout << "button4Handler" << IO::endl;
+
   if (event != IO::ButtonEventPress) {
     return;
   }
@@ -273,11 +288,13 @@ void button4Handler(IO::ButtonEvent event) {
   if (intencity < MAX7219::IntencityF) {
     intencity = (MAX7219::Command)((uint16_t)intencity + 1);
   }
-  
+
   max7219(DeviceCount, intencity);
 }
 
 void button5Handler(IO::ButtonEvent event) {
+  cout << "button5Handler" << IO::endl;
+
   if (event != IO::ButtonEventPress) {
     return;
   }
@@ -285,31 +302,39 @@ void button5Handler(IO::ButtonEvent event) {
   if (intencity > MAX7219::Intencity0) {
     intencity = (MAX7219::Command)((uint16_t)intencity - 1);
   }
-  
+
   max7219(DeviceCount, intencity);
 }
 
 void button6Handler(IO::ButtonEvent event) {
-  if (event == IO::ButtonEventPress) {
-    cout << "button6Handler" << IO::endl;
+  cout << "button6Handler" << IO::endl;
+
+  if (event != IO::ButtonEventPress) {
+    return;
   }
 }
 
 void button7Handler(IO::ButtonEvent event) {
-  if (event == IO::ButtonEventPress) {
-    cout << "button7Handler" << IO::endl;
+  cout << "button7Handler" << IO::endl;
+
+  if (event != IO::ButtonEventPress) {
+    return;
   }
 }
 
 void button8Handler(IO::ButtonEvent event) {
-  if (event == IO::ButtonEventPress) {
-    cout << "button8Handler" << IO::endl;
+  cout << "button8Handler" << IO::endl;
+
+  if (event != IO::ButtonEventPress) {
+    return;
   }
 }
 
 void button9Handler(IO::ButtonEvent event) {
-  if (event == IO::ButtonEventPress) {
-    cout << "button9Handler" << IO::endl;
+  cout << "button9Handler" << IO::endl;
+
+  if (event != IO::ButtonEventPress) {
+    return;
   }
 }
 
@@ -322,9 +347,31 @@ void loop() {
   button6.handle(button6Handler);
   button7.handle(button7Handler);
   button8.handle(button8Handler);
-  // TODO: Fix soldering
-  //  button9.handle(button9Handler);
+  button9.handle(button9Handler);
 
   timeout.handle();
+
+  decode_results results;
+  if (irrecv.decode(&results)) {
+    switch (results.value) {
+      case 0xFF02FD:
+        button1Handler(IO::ButtonEventPress);
+        break;
+      case 0xFF42BD:
+        button2Handler(IO::ButtonEventPress);
+        break;
+      case 0xFF629D:
+        button4Handler(IO::ButtonEventPress);
+        break;
+      case 0xFFA857:
+        button5Handler(IO::ButtonEventPress);
+        break;
+    }
+    cout << IO::hex << results.value << IO::endl;
+    irrecv.resume();
+  }
+  //  uint8_t value = digitalRead(A1); //BA06::read();
+  //  cout << value << IO::endl;
+  //  Delay::milliseconds(1000);
 }
 

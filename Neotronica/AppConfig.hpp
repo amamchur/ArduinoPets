@@ -38,15 +38,15 @@ typedef MCURDK::IC::DS3231<I2C> RTC;
 template <class Pin> 
 using Button = typename ::MCURDK::IO::Button<Pin, Counter, ::MCURDK::IO::PullUpButtonNoPress>;
 
-typedef Button<MCURDK::Board::BD02> Button1;
-typedef Button<MCURDK::Board::BD03> Button2;
-typedef Button<MCURDK::Board::BD04> Button3;
-typedef Button<MCURDK::Board::BD05> Button4;
-typedef Button<MCURDK::Board::BD06> Button5;
-typedef Button<MCURDK::Board::BD07> Button6;
-typedef Button<MCURDK::Board::BD08> Button7;
-typedef Button<MCURDK::Board::BD09> Button8;
-typedef Button<MCURDK::Board::BA06> Button9;
+typedef Button<MCURDK::Board::BA00> Button1;
+typedef Button<MCURDK::Board::BD02> Button2;
+typedef Button<MCURDK::Board::BD03> Button3;
+typedef Button<MCURDK::Board::BD04> Button4;
+typedef Button<MCURDK::Board::BD05> Button5;
+typedef Button<MCURDK::Board::BD06> Button6;
+typedef Button<MCURDK::Board::BD07> Button7;
+typedef Button<MCURDK::Board::BD08> Button8;
+typedef Button<MCURDK::Board::BD09> Button9;
 
 ISR(USART_RX_vect) {
   USART::handleRxIrq();
