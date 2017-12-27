@@ -4,41 +4,39 @@
 #include <IC/TM1637.hpp>
 #include <Data/Segment7.hpp>
 #include <Utils/Timeout.hpp>
-#include <Utils/Tools.hpp>
+#include <Utils/ToolSet.hpp>
+#include <Utils/MillisecondsCounter.hpp>
 
 using namespace MCURDK;
 using namespace MCURDK::GPIO;
+using namespace MCURDK::MCU;
 using namespace MCURDK::IO;
-using namespace MCURDK::Data;
 using namespace MCURDK::Board;
 using namespace MCURDK::Utils;
+using namespace MCURDK::Data;
 
 extern uint32_t timer0_millis;
 
-typedef Utils::Tools<uint32_t, &timer0_millis> Tools;
+typedef MillisecondsCounter<typeof(timer0_millis), &timer0_millis> Counter;
+typedef Utils::ToolSet<Counter> Tools;
 typedef IC::TM1637<BD02, BD03, typename ::Tools::Delay> Display;
 Display display;
 
 void setup() {
+  Serial.begin(9600);
   display.begin();
   display() << Display::CmdPulseWidth0;
 }
 
 void loop() {
-  display() << Display::CmdWriteData;
+  uint16_t value = analogRead(A0);
+  Serial.println(value);
+  
   display() << Display::CmdSetAddress0
-            << Segment7::abcdASCII('D')
-            << Segment7::abcdASCII('E')
-            << Segment7::abcdASCII('A')
-            << Segment7::abcdASCII('D');
-  display() << Display::CmdPulseWidth0;
-  delay(500);
-
-  display() << Display::CmdSetAddress0
-            << Segment7::abcdASCII('B')
-            << Segment7::abcdASCII('E')
-            << Segment7::abcdASCII('E')
-            << Segment7::abcdASCII('F');
+            << Segment7::abcdHex((value >> 12) & 0xF)
+            << Segment7::abcdHex((value >> 8) & 0xF)
+            << Segment7::abcdHex((value >> 4) & 0xF)
+            << Segment7::abcdHex((value >> 0) & 0xF);
   delay(500);
   display() << Display::CmdPulseWidth5;
 }
