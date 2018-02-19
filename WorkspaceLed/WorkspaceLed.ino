@@ -23,7 +23,7 @@ typedef BD05 LedDataIn;
 
 typedef uint32_t CounterType;
 typedef MCURDK::Utils::MillisecondsCounter<CounterType, &timer0_millis> Counter;
-typedef MCURDK::Utils::ToolSet<Counter> Tools;
+typedef MCURDK::Utils::ToolSet<MCURDK::Board::MCU, Counter> Tools;
 typedef Tools::Delay Delay;
 typedef Tools::FunctionTimeout<16, int16_t> Timeout;
 typedef MCURDK::Shields::UnoMultiFunctionalShield<Tools> Shield;
@@ -50,14 +50,14 @@ typedef struct Pixel {
 
 const uint8_t MaxLedValue = 0x0F;
 const float BrightnessStep = 1.0 / (MaxLedValue + 1);
-const int16_t PixelCount = 120;
+const int16_t PixelCount = 50;
 const int16_t Half = PixelCount / 2;
 const int16_t ThirdPart = PixelCount / 3;
 
 uint8_t shiftCount = PixelCount / 3;
 
 float brightness = 0.5;
-LedMode mode = LedMode1_3;
+LedMode mode = LedModeFull;
 Pixel renderBuffer[PixelCount];
 
 typedef TransmitterWS2812<LedDataIn, F_CPU, TimingSK6812> Transmitter;
@@ -139,11 +139,16 @@ void fillData(int lm) {
   uint8_t value = MaxLedValue * brightness;
   for (int16_t i = 0; i < PixelCount; i++) {
     uint8_t w = i < count ? value : 0;
-    renderBuffer[i].green = w;
-    renderBuffer[i].red = w;
+    renderBuffer[i].green = 0;
+    renderBuffer[i].red = 0;
     renderBuffer[i].blue = w;
-    renderBuffer[i].white = w;
+    renderBuffer[i].white = 0;
   }
+
+  renderBuffer[PixelCount - 1].green = 0;
+  renderBuffer[PixelCount - 1].red = 4;
+  renderBuffer[PixelCount - 1].blue = 0;
+  renderBuffer[PixelCount - 1].white = 0;
 }
 
 void setup() {
@@ -181,46 +186,5 @@ void loop() {
   mfs.dynamicIndication();
   mfs.handle();
   timeout.handle();
-
-  decode_results results;
-  if (!irrecv.decode(&results)) {
-    return;
-  }
-  irrecv.resume();
-  switch (results.value) {
-    case 0x807FA857:
-      mode = (LedMode)((mode + 1) % LedModeCount);
-      switch (mode) {
-        case LedMode1_3:
-        case LedMode2_3:
-          shiftCount = PixelCount / 3;
-          break;
-        case LedMode1_4:
-        case LedMode2_4:
-        case LedMode3_4:
-          shiftCount = PixelCount / 4;
-          break;
-        default:
-          shiftCount = 0;
-          break;
-      }
-      mfs.hexToSegments(mode);
-      fillData(mode);
-      neoPixel.display();
-      break;
-    case 0x807FE817:
-      setBrightness(BrightnessStep);
-      break;
-    case 0x807F58A7:
-      setBrightness(-BrightnessStep);
-      break;
-    case 0x807F42BD:
-      timeout.schedule(0, shiftLeft, shiftCount);
-      break;
-    case 0x807F827D:
-      timeout.schedule(0, shiftRight, shiftCount);
-      break;
-  }
-  Serial.println(results.value, HEX);
 }
 
