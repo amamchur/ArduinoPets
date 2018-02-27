@@ -1,16 +1,15 @@
 
 #include <IRremote.h>
 
-#include "MCURDK.h"
-#include "Board/Auto.hpp"
-#include "IO/Button.hpp"
-#include "Utils/ToolSet.hpp"
-#include "Utils/MillisecondsCounter.hpp"
-#include "Shields/UnoMultiFunctionalShield.hpp"
-#include "IC/WS2812.hpp"
+#include <MCURDK.h>
+#include <MCURDK/Board/Auto.hpp>
+#include <MCURDK/IO/Button.hpp>
+#include <MCURDK/Utils/ToolSet.hpp>
+#include <MCURDK/Utils/MillisecondsCounter.hpp>
+#include <MCURDK/Shields/UnoMultiFunctionalShield.hpp>
+#include <MCURDK/IC/WS2812.hpp>
 
 IRrecv irrecv(2);
-IRsend irsend;
 
 using namespace MCURDK;
 using namespace MCURDK::Board;

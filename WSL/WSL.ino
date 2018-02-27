@@ -1,11 +1,11 @@
-#include "MCURDK.h"
-#include "Board/Auto.hpp"
-#include "IO/Button.hpp"
-#include "IC/WS2812.hpp"
-#include "IO/OutputStream.hpp"
-#include "Utils/ToolSet.hpp"
-#include "Utils/MillisecondsCounter.hpp"
-#include "Utils/Prescalers.hpp"
+#include <MCURDK.h>
+#include <MCURDK/Board/Auto.hpp>
+#include <MCURDK/IO/Button.hpp>
+#include <MCURDK/IO/OutputStream.hpp>
+#include <MCURDK/IC/WS2812.hpp>
+#include <MCURDK/Utils/ToolSet.hpp>
+#include <MCURDK/Utils/MillisecondsCounter.hpp>
+#include <MCURDK/Utils/Prescalers.hpp>
 
 using namespace MCURDK;
 using namespace MCURDK::Board;
@@ -18,7 +18,7 @@ using namespace MCURDK::Periph;
 typedef MCURDK::Utils::MillisecondsCounter<decltype(timer0_millis), &timer0_millis> Counter;
 typedef MCURDK::Utils::ToolSet<MCURDK::Board::MCU, Counter> Tools;
 typedef Tools::Delay Delay;
-typedef typename Tools::template FunctionTimeout<8> Timeout;
+typedef typename Tools::template FunctionTimeout<8, int> Timeout;
 typedef MCURDK::Utils::PrescalerLE<Timer1, 1>::Result Timer1Prescaler;
 typedef MCURDK::Utils::PrescalerLE<Timer2, 1>::Result Timer2Prescaler;
 typedef MCURDK::Board::MCU::USARTConfig<F_CPU, 9600> USARTCfg;
@@ -30,6 +30,8 @@ typedef BD11PWM SegR;
 
 const uint8_t PwdMode[] = {0, 5, 10, 30, 70, 150, 255};
 const uint8_t PwdModeCount = sizeof(PwdMode) / sizeof(PwdMode[0]);
+
+void * BackLedsMemOffset  = (void *)0x00;
 
 OutputStream<USART> cout;
 
@@ -65,7 +67,7 @@ typedef struct Pixel {
   uint8_t white;
 } Pixel;
 
-const int16_t PixelCount = 134;
+const int PixelCount = 134;
 Pixel renderBuffer[PixelCount];
 
 typedef BD05 LedDataIn;
@@ -111,35 +113,69 @@ void initializeButtons() {
   button6.begin();
 }
 
-void fillData() {
-  for (int16_t i = 0; i < PixelCount; i++) {
-    renderBuffer[i].green = 0;
-    renderBuffer[i].red = 0;
-    renderBuffer[i].blue = 0;
-    renderBuffer[i].white = 0;
+void writeBackLeds() {
+  uint8_t data[3] = {
+    (uint8_t)SegL::value(),
+    (uint8_t)SegM::value(),
+    (uint8_t)SegR::value()
+  };
+
+  eeprom_write_block(data, BackLedsMemOffset, sizeof(data));
+}
+
+void readBackLeds() {
+  uint8_t data[3];
+  eeprom_read_block(data, BackLedsMemOffset, sizeof(data));
+
+  SegL::value(data[0]);
+  SegM::value(data[1]);
+  SegR::value(data[2]);
+}
+
+void go(int) {
+  readBackLeds();
+
+  memset(renderBuffer, 0, sizeof(renderBuffer));
+  neoPixel.display();
+}
+
+void startupAnimation(int length) {
+  const uint8_t middle = PixelCount / 2;
+  if (length > middle) {
+    timeout.schedule(0, go);
+    return;
   }
-  //
-  //  renderBuffer[PixelCount - 1].green = 15;
-  //  renderBuffer[PixelCount - 1].red = 15;
-  //  renderBuffer[PixelCount - 1].blue = 15;
-  //  renderBuffer[PixelCount - 1].white = 15;
+
+  memset(renderBuffer, 0, sizeof(renderBuffer));
+
+  int i = middle;
+  for (int k = length; k > 0 && i < PixelCount; k--, i++) {
+    renderBuffer[i].green = 1;
+    renderBuffer[i].red = 1;
+    renderBuffer[i].blue = 1;
+    renderBuffer[i].white = 1;
+  }
+
+  i = middle;
+  for (int k = length; k > 0 && i >= 0; k--, i--) {
+    renderBuffer[i].green = 1;
+    renderBuffer[i].red = 1;
+    renderBuffer[i].blue = 1;
+    renderBuffer[i].white = 1;
+  }
+
+  neoPixel.display();
+  timeout.schedule(0, startupAnimation, length + 1);
 }
 
-void displayNextValue() {
-  uint16_t current = SegL::value();
-  uint8_t next = nextValue(current);
-  SegL::write(next);
-  timeout.schedule(500, displayNextValue);
-}
+void ledOn(int);
 
-void ledOn();
-
-void ledOff() {
+void ledOff(int) {
   BD13::low();
   timeout.schedule(500, ledOn);
 }
 
-void ledOn() {
+void ledOn(int) {
   BD13::high();
   timeout.schedule(500, ledOff);
 }
@@ -153,13 +189,12 @@ void setup() {
   initializePWM();
   initializeButtons();
 
-  SegL::write(255);
-  SegM::write(255);
-  SegR::write(255);
+  SegL::value(0);
+  SegM::value(0);
+  SegR::value(0);
 
-  fillData();
   neoPixel.begin();
-  neoPixel.display();
+  timeout.schedule(0, startupAnimation, 1);
 }
 
 template <uint8_t no>
@@ -189,7 +224,8 @@ void button4Handle(ButtonEvent event) {
   if (event == ButtonEventPress) {
     auto current = SegL::value();
     auto next = nextValue(current);
-    SegL::write(next);
+    SegL::value(next);
+    writeBackLeds();
   }
 }
 
@@ -197,7 +233,8 @@ void button5Handle(ButtonEvent event) {
   if (event == ButtonEventPress) {
     auto current = SegM::value();
     auto next = nextValue(current);
-    SegM::write(next);
+    SegM::value(next);
+    writeBackLeds();
   }
 }
 
@@ -205,7 +242,8 @@ void button6Handle(ButtonEvent event) {
   if (event == ButtonEventPress) {
     auto current = SegR::value();
     auto next = nextValue(current);
-    SegR::write(next);
+    SegR::value(next);
+    writeBackLeds();
   }
 }
 
@@ -223,3 +261,10 @@ void loop() {
   timeout.handle();
 }
 
+//int main() {
+//  setup();
+//  while (1) {
+//    loop();
+//  }
+//  return 0;
+//}

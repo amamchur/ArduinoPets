@@ -1,21 +1,23 @@
-#include <ARDK.h>
 
-// Auto configuration
-#include <Board/Auto.hpp>
-#include <Framework/Auto.hpp>
+#include <MCURDK.h>
+#include <MCURDK/IO/Keypad.hpp>
+#include <MCURDK/Board/Auto.hpp>
+#include <MCURDK/IO/DigitalSampler.hpp>
+#include <MCURDK/Utils/ToolSet.hpp>
+#include <MCURDK/Utils/MillisecondsCounter.hpp>
 
-#include <IO/Keypad.hpp>
+using namespace MCURDK::Board;
+using namespace MCURDK::IO;
+using namespace MCURDK::GPIO;
 
-using namespace ARDK::Board;
-using namespace ARDK::IO;
-using namespace ARDK::GPIO;
-using namespace ARDK::Framework;
+typedef MCURDK::Utils::MillisecondsCounter<decltype(timer0_millis), &timer0_millis> Counter;
+typedef MCURDK::Utils::ToolSet<MCURDK::Board::MCU, Counter> Tools;
 
 // Optional keypad configuration parameters, but it could be very useful to tune your board
 class MyKeypadCfg {
   public:
     // That's head pain of embedded programmers - parasitic capacitanceice
-    // Tested with SAM3X 84 MHz clock (Arduino Due) - most powerfull MCU in my collection
+    // Tested with SAM3X 84 MHz clock (Arduino Due)
     // You can decrease it to increase keypad scanning performance
     static constexpr uint16_t CapacitanceCompensationMicrosec = 4;
 
@@ -26,6 +28,7 @@ class MyKeypadCfg {
     // Key press event delay - common UX approach
     static constexpr uint16_t PressDelayMillisec = 300;
 };
+
 
 /*
    Keypad 5x4 (5 rows, 4 columns) definition
@@ -57,7 +60,7 @@ class MyKeypadCfg {
 */
 typedef KeypadRowSelector<BD35, BD37, BD39, BD41, BD43> RowSelector5x4;
 typedef KeypadColumnReader<BD51, BD49, BD47, BD45> ColumnReader5x4;
-typedef Keypad<RowSelector5x4, ColumnReader5x4, Delay, MyKeypadCfg> Keypad5x4;
+typedef Keypad<RowSelector5x4, ColumnReader5x4, Tools, MyKeypadCfg> Keypad5x4;
 char layout5x4[5][4] = {
   {'f', 'F', '#', '*'},
   {'1', '2', '3', '^'},
@@ -68,7 +71,7 @@ char layout5x4[5][4] = {
 
 typedef KeypadRowSelector<BD51, BD49, BD47, BD45> RowSelector4x4;
 typedef KeypadColumnReader<BD43, BD41, BD39, BD37> ColumnReader4x4;
-typedef Keypad<RowSelector4x4, ColumnReader4x4, Delay, MyKeypadCfg> Keypad4x4;
+typedef Keypad<RowSelector4x4, ColumnReader4x4, Tools, MyKeypadCfg> Keypad4x4;
 char layout4x4[4][4] = {
   {'1', '2', '3', 'A'},
   {'4', '5', '6', 'B'},
@@ -78,7 +81,7 @@ char layout4x4[4][4] = {
 
 typedef KeypadRowSelector<BD51, BD49, BD47, BD45> RowSelector3x4;
 typedef KeypadColumnReader<BD43, BD41, BD39> ColumnReader3x4;
-typedef Keypad<RowSelector3x4, ColumnReader3x4, Delay, MyKeypadCfg> Keypad4x3;
+typedef Keypad<RowSelector3x4, ColumnReader3x4, Tools, MyKeypadCfg> Keypad4x3;
 char layout4x3[4][3] = {
   {'1', '2', '3'},
   {'4', '5', '6'},
@@ -88,7 +91,7 @@ char layout4x3[4][3] = {
 
 typedef KeypadRowSelector<BD33> RowSelector1x4;
 typedef KeypadColumnReader<BD31, BD29, BD27, BD25> ColumnReader1x4;
-typedef Keypad<RowSelector1x4, ColumnReader1x4, Delay, MyKeypadCfg> Keypad1x4;
+typedef Keypad<RowSelector1x4, ColumnReader1x4, Tools, MyKeypadCfg> Keypad1x4;
 char layout1x4[1][4] = {
   {'2', '1', '4', '3'},
 };
@@ -138,12 +141,12 @@ void handler(void*, uint8_t button, ButtonEvent e) {
 
 void setup() {
   Serial.begin(9600);
-  keypad.begin(handler);
-  BD13::mode<Output>();
+  keypad.begin();
+  BD13::mode<PinMode::Output>();
 }
 
 void loop() {
-  keypad.handle(millis());
+  keypad.handle(handler);
   BD13::toggle();
 }
 
