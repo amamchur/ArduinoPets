@@ -34,11 +34,11 @@ void setup() {
 uint8_t prev = 0;
 
 void loop() {
-  uint8_t v = RTC.seconds();
-  if (v != prev) {
-    prev = v;
-    cout << RTC.hours() << ":" << RTC.minutes() << ":" << RTC.seconds() << endl;
-  }
+//  uint8_t v = RTC.seconds();
+//  if (v != prev) {
+//    prev = v;
+////    cout << RTC.hours() << ":" << RTC.minutes() << ":" << RTC.seconds() << endl;
+//  }
 
   length = 0;
   //  RTC.seconds();

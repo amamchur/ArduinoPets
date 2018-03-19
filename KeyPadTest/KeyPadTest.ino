@@ -61,7 +61,7 @@ class MyKeypadCfg {
 typedef KeypadRowSelector<BD35, BD37, BD39, BD41, BD43> RowSelector5x4;
 typedef KeypadColumnReader<BD51, BD49, BD47, BD45> ColumnReader5x4;
 typedef Keypad<RowSelector5x4, ColumnReader5x4, Tools, MyKeypadCfg> Keypad5x4;
-char layout5x4[5][4] = {
+static char layout5x4[5][4] = {
   {'f', 'F', '#', '*'},
   {'1', '2', '3', '^'},
   {'4', '5', '6', 'v'},
@@ -72,7 +72,7 @@ char layout5x4[5][4] = {
 typedef KeypadRowSelector<BD51, BD49, BD47, BD45> RowSelector4x4;
 typedef KeypadColumnReader<BD43, BD41, BD39, BD37> ColumnReader4x4;
 typedef Keypad<RowSelector4x4, ColumnReader4x4, Tools, MyKeypadCfg> Keypad4x4;
-char layout4x4[4][4] = {
+static char layout4x4[4][4] = {
   {'1', '2', '3', 'A'},
   {'4', '5', '6', 'B'},
   {'7', '8', '9', 'C'},
@@ -82,7 +82,7 @@ char layout4x4[4][4] = {
 typedef KeypadRowSelector<BD51, BD49, BD47, BD45> RowSelector3x4;
 typedef KeypadColumnReader<BD43, BD41, BD39> ColumnReader3x4;
 typedef Keypad<RowSelector3x4, ColumnReader3x4, Tools, MyKeypadCfg> Keypad4x3;
-char layout4x3[4][3] = {
+static char layout4x3[4][3] = {
   {'1', '2', '3'},
   {'4', '5', '6'},
   {'7', '8', '9'},
@@ -92,8 +92,43 @@ char layout4x3[4][3] = {
 typedef KeypadRowSelector<BD33> RowSelector1x4;
 typedef KeypadColumnReader<BD31, BD29, BD27, BD25> ColumnReader1x4;
 typedef Keypad<RowSelector1x4, ColumnReader1x4, Tools, MyKeypadCfg> Keypad1x4;
-char layout1x4[1][4] = {
+static char layout1x4[1][4] = {
   {'2', '1', '4', '3'},
+};
+
+template <uint8_t rows, uint8_t columns>
+struct Mapper {
+  static char getChar(uint8_t) {
+    return '?';
+  }
+};
+
+template<>
+struct Mapper<5, 4> {
+  static char getChar(uint8_t row, uint8_t column) {
+    return layout5x4[row][column];
+  }
+};
+
+template<>
+struct Mapper<4, 4> {
+  static char getChar(uint8_t row, uint8_t column) {
+    return layout4x4[row][column];
+  }
+};
+
+template<>
+struct Mapper<4, 3> {
+  static char getChar(uint8_t row, uint8_t column) {
+    return layout4x3[row][column];
+  }
+};
+
+template<>
+struct Mapper<1, 4> {
+  static char getChar(uint8_t row, uint8_t column) {
+    return layout1x4[row][column];
+  }
 };
 
 // Choose one of keypad configuration
@@ -104,43 +139,20 @@ typedef Keypad5x4 MyKeypad;
 
 MyKeypad keypad;
 
-void handler(void*, uint8_t button, ButtonEvent e) {
+void handler(uint8_t button, ButtonEvent e) {
   if (e != ButtonEventPress) {
-    return;
-  }
-
-  char *layout = nullptr;
-
-  if (MyKeypad::Rows == 5 && MyKeypad::Columns == 4) {
-    layout = &layout5x4[0][0];
-  }
-
-  if (MyKeypad::Rows == 4 && MyKeypad::Columns == 4) {
-    layout = &layout4x4[0][0];
-  }
-
-  if (MyKeypad::Rows == 4 && MyKeypad::Columns == 3) {
-    layout = &layout4x3[0][0];
-  }
-
-  if (MyKeypad::Rows == 1 && MyKeypad::Columns == 4) {
-    layout = &layout1x4[0][0];
-  }
-
-  if (layout == nullptr) {
     return;
   }
 
   uint8_t row = button >> 4;
   uint8_t column = button & 0xF;
-  char ch = *(layout + MyKeypad::Columns * row + column);
-
+  char ch = Mapper<MyKeypad::Rows, MyKeypad::Columns>::getChar(row, column);
   Serial.print(ch);
   Serial.println("");
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   keypad.begin();
   BD13::mode<PinMode::Output>();
 }
