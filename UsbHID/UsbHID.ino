@@ -3,11 +3,11 @@
 #include "Keyboard.h"
 
 #include <MCURDK.h>
-#include <Board/ArduinoLeonardo.hpp>
-#include <Utils/ToolSet.hpp>
-#include <Utils/MillisecondsCounter.hpp>
-#include <IO/Button.hpp>
-#include <IO/RotaryEncoder.hpp>
+#include <MCURDK/Board/ArduinoLeonardo.hpp>
+#include <MCURDK/Utils/ToolSet.hpp>
+#include <MCURDK/Utils/MillisecondsCounter.hpp>
+#include <MCURDK/IO/Button.hpp>
+#include <MCURDK/IO/RotaryEncoder.hpp>
 
 #include <SPI.h>
 #include <Wire.h>
@@ -25,12 +25,12 @@ using namespace MCURDK::Board;
 using namespace MCURDK::Utils;
 
 typedef MillisecondsCounter<typeof(timer0_millis), &timer0_millis> Counter;
-typedef Utils::ToolSet<Counter> Tools;
-typedef Button<BA02, Counter> LeftButton;
-typedef Button<BD05, Counter> RightButton;
-typedef RotaryEncoder<BD07, BD08, Rotary2PhaseMachine> Encoder;
+typedef Utils::ToolSet<PCB::MCU, Counter> Tools;
+typedef Button<PCB::BD08, Counter> LeftButton;
+typedef Button<PCB::BD09, Counter> RightButton;
+typedef RotaryEncoder<PCB::BD07, PCB::BD06, Rotary2PhaseMachine> Encoder;
 
-Tools::FunctionTimeout<16> timeout;
+::Tools::FunctionTimeout<16> timeout;
 
 const uint32_t PressInteval = 61000;
 uint32_t nextPressing = 0;
@@ -40,19 +40,18 @@ int16_t maxStep = 10;
 float originMax = 0;
 
 typedef enum Menu {
-  MenuCalibrartion = 0,
-  MenuPressingState,
+  MenuPressingState = 0,
   MenuEmpty,
   MenuCount
 } Menu;
 
-Menu currentMenu = MenuCalibrartion;
+Menu currentMenu = MenuPressingState;
 bool pressingEnabled = false;
 
 void renderMenu();
 
 void sendKeys() {
-  Keyboard.print("987654321");
+  Keyboard.print("98765");
   nextPressing = Counter::now() + PressInteval;
   timeout.schedule(PressInteval, sendKeys);
   renderMenu();
@@ -64,7 +63,7 @@ void handlerLeftButton(ButtonEvent event) {
       timeout.clear();
       nextPressing = Counter::now() + PressInteval;
       pressingEnabled = false;
-      timeout.schedule(0, renderManuInterval);
+      timeout.schedule(0, renderMenuInterval);
     default:
       break;
   }
@@ -76,25 +75,15 @@ void handlerRightButton(ButtonEvent event) {
       timeout.clear();
       timeout.schedule(0, sendKeys);
       pressingEnabled = true;
-      timeout.schedule(0, renderManuInterval);
+      timeout.schedule(0, renderMenuInterval);
     default:
       break;
   }
 }
 
-void handleEncoder(RotaryEvent event) {
-  currentMenu = (currentMenu + 1) % MenuCount;
+void handleEncoder(RotaryEvent) {
+  currentMenu = (Menu)((currentMenu + 1) % MenuCount);
   renderMenu();
-}
-
-void renderCalibrartion() {
-  display.println("Calibr-n");
-
-  display.print("XO: ");
-  display.println(xAxisOrigin);
-
-  display.print("YO: ");
-  display.println(yAxisOrigin);
 }
 
 void renderPresseingState() {
@@ -115,9 +104,6 @@ void renderMenu() {
   display.clearDisplay();
 
   switch (currentMenu) {
-    case MenuCalibrartion:
-      renderCalibrartion();
-      break;
     case MenuPressingState:
       renderPresseingState();
       break;
@@ -131,34 +117,19 @@ void renderMenu() {
   display.display();
 }
 
-void renderManuInterval() {
+void renderMenuInterval() {
   renderMenu();
-  timeout.schedule(1000, renderManuInterval);
+  timeout.schedule(1000, renderMenuInterval);
 }
 
 LeftButton leftButton;
 RightButton rightButton;
 Encoder encoder;
 
-void calibrate() {
-  pinMode(A0, INPUT);
-  pinMode(A1, INPUT);
-
-  for (int i = 0; i < 16; i++) {
-    xAxisOrigin += analogRead(A0);
-    yAxisOrigin += analogRead(A1);
-  }
-
-  xAxisOrigin /= 16;
-  yAxisOrigin /= 16;
-
-  originMax = max(xAxisOrigin, yAxisOrigin);
-}
-
 void setup() {
-  BD09::mode<Input>();
-  BD08::mode<Output>();
-  BD07::mode<Output>();
+  PCB::BD09::mode<PinMode::Input>();
+  PCB::BD08::mode<PinMode::Output>();
+  PCB::BD07::mode<PinMode::Output>();
 
   leftButton.begin();
   rightButton.begin();
@@ -167,10 +138,9 @@ void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();
 
-  calibrate();
   Keyboard.begin();
 
-  timeout.schedule(0, renderManuInterval);
+  timeout.schedule(0, renderMenuInterval);
 }
 
 int value = 0;
